@@ -137,7 +137,18 @@ export async function deleteGameSession(id: string): Promise<void> {
  */
 export async function listQuestionPacks(): Promise<QuestionPack[]> {
   try {
-    return await db.questionPacks.toArray();
+    const packs = await db.questionPacks.toArray();
+    if (packs.length === 0) {
+      return STARTER_PACKS;
+    }
+    // Stable order: starter packs in defined order, followed by custom packs
+    const starterOrder = new Map(STARTER_PACKS.map((p, idx) => [p.id, idx]));
+    return packs.sort((a, b) => {
+      const orderA = starterOrder.has(a.id) ? (starterOrder.get(a.id) as number) : 999;
+      const orderB = starterOrder.has(b.id) ? (starterOrder.get(b.id) as number) : 999;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.title.localeCompare(b.title);
+    });
   } catch (err) {
     console.error('Failed to list question packs:', err);
     return STARTER_PACKS;

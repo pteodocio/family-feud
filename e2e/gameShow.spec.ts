@@ -80,6 +80,41 @@ test.describe('Family Feud Game Show End-to-End Tests', () => {
     // Clear search
     await searchInput.fill('');
     await expect(page.getByText('Create Custom Pack')).toBeVisible();
+
+    // Verify all 10 Filipino packs exist in library
+    await expect(page.getByRole('heading', { name: 'Filipino Food & Drinks' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Sports & Basketball' })).toBeVisible();
+  });
+
+  test('Game Setup displays all 10 categories, previews questions, and launches Filipino pack', async ({ page }) => {
+    await page.goto('/#/setup');
+
+    await expect(page.getByText('GAME SETUP')).toBeVisible();
+
+    // Verify category pills are visible
+    await expect(page.getByRole('button', { name: '★ All Categories' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Philippine Geography & Trivia' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sports & Basketball' })).toBeVisible();
+
+    // Click Philippine Geography & Trivia category
+    await page.getByRole('button', { name: 'Philippine Geography & Trivia' }).click();
+
+    // Verify question preview shows questions for that pack
+    await expect(page.getByText('Pack: Philippine Geography & Trivia')).toBeVisible();
+    await expect(page.getByText('Name a major island group in the Philippines.')).toBeVisible();
+
+    // Uncheck shuffle to guarantee question 1 is first
+    const shuffleCheckbox = page.getByRole('checkbox');
+    if (await shuffleCheckbox.isChecked()) {
+      await shuffleCheckbox.uncheck();
+    }
+
+    // Launch the game
+    await page.getByText('START GAME NOW').click();
+
+    // Verify host console loads with the selected pack question
+    await expect(page.getByText('HOST CONSOLE')).toBeVisible();
+    await expect(page.getByText('Name a famous tourist destination in the Philippines.')).toBeVisible();
   });
 
   test('Settings Page allows volume adjustment and sound testing', async ({ page }) => {

@@ -1,6 +1,9 @@
 import type { QuestionPack } from '../types/game';
+import { FILIPINO_BUILTIN_PACKS } from './filipinoPacks';
 
-export const STARTER_PACKS: QuestionPack[] = [
+export { FILIPINO_BUILTIN_PACKS };
+
+const CLASSIC_STARTER_PACKS: QuestionPack[] = [
   {
     id: 'pack-filipino-fiesta',
     title: 'Pinoy Fiesta & Filipino Family Life',
@@ -308,3 +311,9 @@ export const STARTER_PACKS: QuestionPack[] = [
     ],
   },
 ];
+
+export const STARTER_PACKS: QuestionPack[] = [
+  ...FILIPINO_BUILTIN_PACKS,
+  ...CLASSIC_STARTER_PACKS,
+];
+

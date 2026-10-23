@@ -23,7 +23,7 @@ describe('Complete Full Game Show Flow Integration Test', () => {
   });
 
   it('plays through a full 4-round game into Fast Money and final victory', async () => {
-    const starterPack = STARTER_PACKS[0]; // Pinoy Fiesta & Filipino Family Life
+    const starterPack = STARTER_PACKS.find((p) => p.id === 'pack-filipino-fiesta')!;
     expect(starterPack.questions.length).toBeGreaterThanOrEqual(4);
 
     const config: GameConfig = {
