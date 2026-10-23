@@ -11,19 +11,48 @@ body {
   padding: 0;
   background-color: #030816;
   color: #f8fafc;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   overflow-x: hidden;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
-/* Studio stage lighting radial gradients */
+/* Studio stage lighting background */
 .stage-background {
-  background: radial-gradient(circle at 50% 15%, #183d8e 0%, #0c204d 45%, #030816 85%);
+  background: radial-gradient(circle at 50% 20%, #15387d 0%, #0a1e48 40%, #030816 85%);
 }
 
 .studio-glow {
-  background: radial-gradient(ellipse at top, rgba(29, 78, 216, 0.45) 0%, rgba(11, 32, 80, 0.25) 50%, rgba(3, 8, 22, 0.95) 100%);
+  background: radial-gradient(ellipse at top, rgba(29, 78, 216, 0.4) 0%, rgba(11, 32, 80, 0.2) 50%, rgba(3, 8, 22, 0.95) 100%);
+}
+
+/* Realistic Family Feud Game Show Board Arch with Marquee Bulb Dots */
+.feud-board-outer {
+  background: linear-gradient(180deg, #b88200 0%, #f5b000 15%, #ffd15c 50%, #f5b000 85%, #8a6200 100%);
+  border-radius: 2rem;
+  padding: 10px;
+  box-shadow: 0 0 45px rgba(245, 176, 0, 0.45), 0 25px 60px rgba(0, 0, 0, 0.95), inset 0 2px 4px rgba(255, 255, 255, 0.6);
+  position: relative;
+}
+
+/* Studded incandescent light bulb dots around the frame */
+.feud-board-outer::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 1.85rem;
+  border: 2px dashed rgba(255, 255, 255, 0.45);
+  pointer-events: none;
+}
+
+.feud-board-inner {
+  background: radial-gradient(ellipse at center, #091e4e 0%, #051336 60%, #02091d 100%);
+  border: 4px solid #0f2b69;
+  border-radius: 1.6rem;
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.9);
 }
 
 /* 3D Flip Card Container */
@@ -50,31 +79,31 @@ body {
   height: 100%;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
-  border-radius: 0.5rem;
+  border-radius: 0.65rem;
 }
 
 .flip-card-back {
   transform: rotateY(180deg);
 }
 
-/* Game show board border styling with marquee bulb dots */
-.game-board-frame {
-  border: 6px solid #f5b000;
-  border-radius: 1.25rem;
-  box-shadow: 0 0 35px rgba(245, 176, 0, 0.4), inset 0 0 25px rgba(11, 32, 80, 0.8), 0 25px 60px rgba(0, 0, 0, 0.9);
+/* Scoreboard LED Digital Digits */
+.led-score {
+  font-family: 'Outfit', 'Montserrat', monospace;
+  font-weight: 900;
+  letter-spacing: -0.02em;
 }
 
-/* Text glow utilities */
+/* Text glow utilities (Crisp & High Contrast) */
 .text-glow-gold {
-  text-shadow: 0 0 12px rgba(245, 176, 0, 0.7), 0 0 25px rgba(245, 176, 0, 0.4);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8), 0 0 16px rgba(245, 176, 0, 0.6);
 }
 
 .text-glow-blue {
-  text-shadow: 0 0 15px rgba(59, 130, 246, 0.8), 0 0 30px rgba(29, 78, 216, 0.5);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8), 0 0 16px rgba(59, 130, 246, 0.7);
 }
 
 .text-glow-red {
-  text-shadow: 0 0 20px rgba(239, 68, 68, 0.9), 0 0 40px rgba(220, 38, 38, 0.7);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8), 0 0 16px rgba(239, 68, 68, 0.8);
 }
 
 /* Reduced motion support */

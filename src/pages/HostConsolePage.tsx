@@ -270,27 +270,27 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
               <span className="text-blue-300 text-xs font-bold uppercase block mb-1">
                 Question Prompt (Read Aloud to Contestants):
               </span>
-              <h2 className="font-display font-black text-2xl text-white">
+              <h2 className="font-display font-bold text-xl sm:text-2xl text-white leading-snug">
                 "{currentRound.question.prompt}"
               </h2>
             </div>
 
             {/* Answer Cheat Sheet for Host */}
             <div className="mb-6">
-              <span className="text-xs font-bold text-gray-400 uppercase block mb-2">
+              <span className="text-xs font-bold text-gray-300 uppercase block mb-2">
                 Survey Answers & Point Values:
               </span>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 {currentRound.question.answers.map((ans, idx) => (
                   <div
                     key={ans.id}
-                    className="bg-[#0b2256] border border-blue-800 rounded-lg p-2 flex items-center justify-between text-xs"
+                    className="bg-[#0b2256] border border-blue-700/60 rounded-lg p-2.5 flex items-center justify-between text-xs"
                   >
-                    <span className="truncate pr-1">
+                    <span className="truncate pr-1 text-white font-semibold">
                       <span className="font-bold text-feud-gold mr-1">{idx + 1}.</span>
                       {ans.text}
                     </span>
-                    <span className="font-bold font-mono text-feud-gold">{ans.points}</span>
+                    <span className="font-bold font-mono text-feud-gold text-sm shrink-0">{ans.points}</span>
                   </div>
                 ))}
               </div>
@@ -350,18 +350,18 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
             {/* Top Prompt Card */}
             <div className="bg-[#071638] border-2 border-blue-800 rounded-2xl p-4 shadow-md flex items-center justify-between gap-4">
               <div className="min-w-0">
-                <span className="text-feud-gold text-xs font-bold uppercase tracking-wider block">
+                <span className="text-feud-gold text-xs font-bold uppercase tracking-wider block mb-0.5">
                   Question Prompt (Round {currentRound.roundIndex + 1}):
                 </span>
-                <h2 className="font-display font-black text-xl sm:text-2xl text-white truncate">
+                <h2 className="font-display font-bold text-lg sm:text-xl md:text-2xl text-white leading-snug">
                   "{currentRound.question.prompt}"
                 </h2>
               </div>
 
               {/* Active Control Team Badge */}
               <div className="bg-black/60 border border-blue-700 rounded-xl px-4 py-2 text-right shrink-0">
-                <span className="text-gray-400 text-[10px] uppercase font-bold block">Controlling Team:</span>
-                <span className="font-display font-black text-lg text-blue-300">
+                <span className="text-gray-300 text-[10px] uppercase font-bold block">Controlling Team:</span>
+                <span className="font-display font-extrabold text-lg text-blue-200">
                   {currentRound.controlTeamId === session.team1.id ? session.team1.name : session.team2.name}
                 </span>
               </div>
@@ -481,13 +481,13 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0 pr-2">
-                      <div className="w-7 h-7 rounded-full bg-blue-950 border border-blue-700 flex items-center justify-center font-bold text-xs text-feud-gold font-mono shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-blue-950 border border-blue-600 flex items-center justify-center font-bold text-sm text-feud-gold font-mono shrink-0">
                         {idx + 1}
                       </div>
                       <div className="min-w-0">
-                        <div className="font-bold text-sm text-white truncate">{ans.text}</div>
+                        <div className="font-bold text-sm text-white leading-tight">{ans.text}</div>
                         {ans.acceptedVariants && ans.acceptedVariants.length > 0 && (
-                          <div className="text-[10px] text-gray-400 truncate">
+                          <div className="text-[11px] text-blue-200/90 font-medium mt-0.5">
                             Variants: {ans.acceptedVariants.join(', ')}
                           </div>
                         )}
@@ -679,7 +679,7 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
                   >
                     {/* Prompt */}
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-bold text-gray-300 mb-1">
+                      <div className="text-sm font-bold text-white mb-1.5 leading-snug">
                         <span className="text-feud-gold mr-1">{qIdx + 1}.</span>
                         {q.prompt}
                       </div>
