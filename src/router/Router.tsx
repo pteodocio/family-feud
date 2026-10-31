@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 
 export interface RouteMatch {
@@ -9,7 +9,9 @@ export interface RouteMatch {
 interface RouterContextType {
   currentPath: string;
   navigate: (to: string) => void;
-  openDisplayWindow: (gameId: string) => void;
+  openDisplayWindow: (gameId: string) => Promise<Window | null>;
+  closeDisplayWindow: () => void;
+  isDisplayWindowOpen: () => boolean;
 }
 
 const RouterContext = createContext<RouterContextType | null>(null);
@@ -28,6 +30,7 @@ function parsePath(): string {
 
 export function RouterProvider({ children }: { children: ReactNode }) {
   const [currentPath, setCurrentPath] = useState<string>(parsePath);
+  const displayWindowRef = useRef<Window | null>(null);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -52,13 +55,60 @@ export function RouterProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const openDisplayWindow = (gameId: string) => {
+  const openDisplayWindow = async (gameId: string): Promise<Window | null> => {
     const url = `${window.location.origin}${window.location.pathname}#/display/${gameId}`;
-    window.open(url, `feud_display_${gameId}`, 'width=1280,height=720,menubar=no,toolbar=no,location=no,status=no');
+    let windowFeatures = 'width=1280,height=720,left=100,top=100,menubar=no,toolbar=no,location=no,status=no';
+
+    try {
+      if (typeof window !== 'undefined' && 'getScreenDetails' in window) {
+        const screenDetails = await (window as any).getScreenDetails();
+        if (screenDetails?.screens?.length > 1) {
+          const secondary =
+            screenDetails.screens.find((s: any) => s !== screenDetails.currentScreen) ||
+            screenDetails.screens[1];
+          if (secondary) {
+            windowFeatures = `left=${secondary.availLeft},top=${secondary.availTop},width=${secondary.availWidth},height=${secondary.availHeight},menubar=no,toolbar=no,location=no,status=no`;
+          }
+        }
+      }
+    } catch {
+      // Fallback to default dimensions if Window Management API fails or permission denied
+    }
+
+    const targetName = `feud_display_${gameId}`;
+    const win = window.open(url, targetName, windowFeatures);
+    if (win) {
+      win.focus();
+      displayWindowRef.current = win;
+    }
+    return win;
+  };
+
+  const closeDisplayWindow = () => {
+    if (displayWindowRef.current && !displayWindowRef.current.closed) {
+      try {
+        displayWindowRef.current.close();
+      } catch (err) {
+        console.warn('Could not close window directly:', err);
+      }
+    }
+    displayWindowRef.current = null;
+  };
+
+  const isDisplayWindowOpen = () => {
+    return Boolean(displayWindowRef.current && !displayWindowRef.current.closed);
   };
 
   return (
-    <RouterContext.Provider value={{ currentPath, navigate, openDisplayWindow }}>
+    <RouterContext.Provider
+      value={{
+        currentPath,
+        navigate,
+        openDisplayWindow,
+        closeDisplayWindow,
+        isDisplayWindowOpen,
+      }}
+    >
       {children}
     </RouterContext.Provider>
   );

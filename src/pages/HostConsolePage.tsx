@@ -11,9 +11,17 @@ import {
   Clock,
   Play,
   Pause,
+  Maximize,
+  X,
+  Radio,
+  EyeOff,
+  ChevronLeft,
+  ChevronRight,
+  Trophy,
 } from 'lucide-react';
 import { useGameStore } from '../store/gameStore';
 import { useRouter } from '../router/Router';
+import { syncBus } from '../sync/broadcast';
 import { GamePhase } from '../types/game';
 import { matchAnswer } from '../engine/answerMatcher';
 import { ScoreAdjustModal } from '../components/host/ScoreAdjustModal';
@@ -30,6 +38,7 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
     settings,
     updateSettings,
     revealAnswer,
+    hideAnswer,
     revealAllRemainingAnswers,
     recordStrike,
     clearStrike,
@@ -37,7 +46,10 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
     resolveSteal,
     awardRoundBank,
     advanceRound,
+    navigateToRound,
+    previousRound,
     restartRound,
+    endGame,
     adjustScore,
     undo,
     submitFastMoneyAnswer,
@@ -51,17 +63,89 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
     tickFastMoneyTimer,
   } = useGameStore();
 
-  const { openDisplayWindow, navigate } = useRouter();
+  const { openDisplayWindow, closeDisplayWindow, isDisplayWindowOpen, navigate } = useRouter();
 
   const [guessInput, setGuessInput] = useState('');
   const [isScoreModalOpen, setIsScoreModalOpen] = useState(false);
   const [fastMoneyActivePlayer, setFastMoneyActivePlayer] = useState<1 | 2>(1);
   const [showRestartConfirm, setShowRestartConfirm] = useState(false);
+  const [showEndGameConfirm, setShowEndGameConfirm] = useState(false);
+  const [tvStatus, setTvStatus] = useState<'connected' | 'disconnected' | 'reconnecting'>('disconnected');
+  const [lastPongTime, setLastPongTime] = useState<number>(0);
 
   // Load session on mount
   useEffect(() => {
     loadSession(gameId);
   }, [gameId, loadSession]);
+
+  // TV Heartbeat ping/pong and sync listener
+  useEffect(() => {
+    const pingInterval = setInterval(() => {
+      syncBus.sendPing(Date.now());
+      setLastPongTime((prevPong) => {
+        if (prevPong > 0 && Date.now() - prevPong > 7000) {
+          setTvStatus('disconnected');
+        }
+        return prevPong;
+      });
+    }, 3000);
+
+    syncBus.sendPing(Date.now());
+
+    const unsubPong = syncBus.subscribePong(() => {
+      setTvStatus('connected');
+      setLastPongTime(Date.now());
+    });
+
+    const unsubReqSync = syncBus.subscribeRequestSync(() => {
+      setTvStatus('connected');
+      setLastPongTime(Date.now());
+      if (session) {
+        syncBus.broadcastState(session);
+      }
+    });
+
+    return () => {
+      clearInterval(pingInterval);
+      unsubPong();
+      unsubReqSync();
+    };
+  }, [session]);
+
+  const handleOpenTVDisplay = async () => {
+    if (!session) return;
+    setTvStatus('reconnecting');
+    await openDisplayWindow(session.id);
+    syncBus.sendPing(Date.now());
+    syncBus.broadcastState(session);
+  };
+
+  const handleReconnectDisplay = () => {
+    if (!session) return;
+    setTvStatus('reconnecting');
+    syncBus.requestSync();
+    syncBus.broadcastState(session);
+    syncBus.sendPing(Date.now());
+  };
+
+  const handleCheckDisplayStatus = () => {
+    syncBus.sendPing(Date.now());
+    if (isDisplayWindowOpen()) {
+      setTvStatus('connected');
+    } else if (Date.now() - lastPongTime > 4000) {
+      setTvStatus('reconnecting');
+    }
+  };
+
+  const handleFullscreenDisplay = () => {
+    syncBus.requestFullscreen();
+  };
+
+  const handleCloseTVDisplay = () => {
+    closeDisplayWindow();
+    syncBus.closeDisplay();
+    setTvStatus('disconnected');
+  };
 
   // Fast Money Timer Interval
   useEffect(() => {
@@ -159,16 +243,6 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2">
-          {/* Pop out TV Display */}
-          <button
-            onClick={() => openDisplayWindow(session.id)}
-            className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md"
-            title="Open TV Board in a separate window for television / projector"
-          >
-            <Tv className="w-4 h-4" />
-            Open TV Display
-          </button>
-
           {/* Undo Action */}
           <button
             onClick={undo}
@@ -202,6 +276,16 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
             Restart Round
           </button>
 
+          {/* End Game */}
+          <button
+            onClick={() => setShowEndGameConfirm(true)}
+            className="bg-purple-950 hover:bg-purple-900 border border-purple-700 text-purple-200 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1"
+            title="Conclude game and show Champion Results"
+          >
+            <Trophy className="w-3.5 h-3.5" />
+            End Game
+          </button>
+
           {/* Sound Toggle */}
           <button
             onClick={() => updateSettings({ soundEnabled: !settings.soundEnabled })}
@@ -216,6 +300,133 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
           </button>
         </div>
       </header>
+
+      {/* TV DISPLAY & QUESTION NAVIGATION TOOLBAR */}
+      <div className="bg-[#05112e] border-b border-blue-800/80 px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+        {/* TV Connection & Controls */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Status Indicator Pill */}
+          <div className="flex items-center gap-1.5 bg-black/60 border border-blue-900 rounded-lg px-2.5 py-1">
+            <span className="font-bold text-gray-300">TV Display:</span>
+            <span
+              className={`inline-flex items-center gap-1.5 font-bold uppercase tracking-wider text-[11px] px-2 py-0.5 rounded-full ${
+                tvStatus === 'connected'
+                  ? 'bg-green-950/80 text-green-300 border border-green-500'
+                  : tvStatus === 'reconnecting'
+                  ? 'bg-amber-950/80 text-amber-300 border border-amber-500 animate-pulse'
+                  : 'bg-red-950/80 text-red-300 border border-red-500'
+              }`}
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  tvStatus === 'connected'
+                    ? 'bg-green-400'
+                    : tvStatus === 'reconnecting'
+                    ? 'bg-amber-400 animate-ping'
+                    : 'bg-red-400'
+                }`}
+              />
+              {tvStatus === 'connected'
+                ? 'Connected'
+                : tvStatus === 'reconnecting'
+                ? 'Reconnecting'
+                : 'Disconnected'}
+            </span>
+          </div>
+
+          {/* TV Screen Action Buttons */}
+          <button
+            onClick={handleOpenTVDisplay}
+            className="bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md"
+            title="Open TV Board in a secondary monitor or separate window"
+          >
+            <Tv className="w-3.5 h-3.5" />
+            Open TV Display
+          </button>
+
+          <button
+            onClick={handleReconnectDisplay}
+            className="bg-blue-950 hover:bg-blue-900 text-blue-200 border border-blue-700/70 px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5"
+            title="Re-broadcast session state and reconnect display"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Reconnect Display
+          </button>
+
+          <button
+            onClick={handleCheckDisplayStatus}
+            className="bg-blue-950 hover:bg-blue-900 text-blue-200 border border-blue-700/70 px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5"
+            title="Check TV display connection status"
+          >
+            <Radio className="w-3.5 h-3.5" />
+            Check Status
+          </button>
+
+          <button
+            onClick={handleFullscreenDisplay}
+            className="bg-indigo-950 hover:bg-indigo-900 text-indigo-200 border border-indigo-700/70 px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5"
+            title="Toggle fullscreen on TV display"
+          >
+            <Maximize className="w-3.5 h-3.5" />
+            Fullscreen TV
+          </button>
+
+          <button
+            onClick={handleCloseTVDisplay}
+            className="bg-red-950/60 hover:bg-red-900 text-red-200 border border-red-800 px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5"
+            title="Close the TV display window"
+          >
+            <X className="w-3.5 h-3.5" />
+            Close TV Display
+          </button>
+        </div>
+
+        {/* Question Navigation Controls */}
+        <div className="flex items-center gap-2">
+          <span className="text-gray-400 font-bold uppercase text-[11px]">Questions:</span>
+          <button
+            onClick={previousRound}
+            disabled={session.currentRoundIndex === 0}
+            className="bg-blue-950 hover:bg-blue-900 disabled:opacity-40 border border-blue-700 text-white px-2.5 py-1 rounded-md font-bold flex items-center gap-1"
+            title="Go to previous round / question"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+            Previous
+          </button>
+
+          <div className="flex items-center gap-1">
+            {session.rounds.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => navigateToRound(idx)}
+                className={`w-6 h-6 rounded text-[11px] font-bold font-mono transition-all ${
+                  idx === session.currentRoundIndex
+                    ? 'bg-feud-gold text-feud-dark font-black shadow-gold-glow'
+                    : 'bg-blue-950 hover:bg-blue-800 text-blue-200 border border-blue-800'
+                }`}
+                title={`Jump to Round ${idx + 1}`}
+              >
+                {idx + 1}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => {
+              if (session.currentRoundIndex < session.rounds.length - 1) {
+                navigateToRound(session.currentRoundIndex + 1);
+              } else {
+                advanceRound();
+              }
+            }}
+            className="bg-blue-950 hover:bg-blue-900 border border-blue-700 text-white px-2.5 py-1 rounded-md font-bold flex items-center gap-1"
+            title="Go to next round / question"
+          >
+            Next
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
 
       {/* QUICK STATUS BAR */}
       <div className="bg-[#091f52] border-b border-blue-900/80 px-4 py-2 flex items-center justify-between text-xs">
@@ -551,9 +762,19 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
                       </span>
 
                       {isRevealed ? (
-                        <span className="text-green-400 font-bold text-xs px-2.5 py-1 bg-green-950/80 border border-green-700/60 rounded">
-                          Revealed
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-green-400 font-bold text-xs px-2.5 py-1 bg-green-950/80 border border-green-700/60 rounded">
+                            Revealed
+                          </span>
+                          <button
+                            onClick={() => hideAnswer(ans.id)}
+                            className="bg-amber-950 hover:bg-amber-900 border border-amber-600/70 text-amber-200 text-xs font-bold px-2 py-1 rounded flex items-center gap-1 shadow"
+                            title="Hide / Undo reveal for this answer"
+                          >
+                            <EyeOff className="w-3.5 h-3.5" />
+                            Hide
+                          </button>
+                        </div>
                       ) : (
                         <button
                           onClick={() => revealAnswer(ans.id)}
@@ -898,6 +1119,38 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
                 className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-xs font-bold"
               >
                 Yes, Restart Round
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* END GAME CONFIRMATION MODAL */}
+      {showEndGameConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+          <div className="bg-[#0b1c44] border-2 border-purple-500 rounded-2xl p-6 max-w-sm w-full text-white shadow-xl">
+            <h3 className="font-display font-black text-xl text-purple-300 mb-2 flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-feud-gold" />
+              End Game Now?
+            </h3>
+            <p className="text-xs text-gray-300 mb-4">
+              This will conclude regular play and display the Champion Victory screen on the TV Display.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowEndGameConfirm(false)}
+                className="px-4 py-2 bg-gray-800 rounded-lg text-xs font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  endGame();
+                  setShowEndGameConfirm(false);
+                }}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg text-xs font-bold"
+              >
+                Yes, End Game
               </button>
             </div>
           </div>

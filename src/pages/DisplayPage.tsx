@@ -18,12 +18,16 @@ interface DisplayPageProps {
 export function DisplayPage({ gameId }: DisplayPageProps) {
   const [session, setSession] = useState<GameSession | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean }>({
+    remaining: 20,
+    running: false,
+  });
   const [strikeGraphic, setStrikeGraphic] = useState<{ show: boolean; count: number }>({
     show: false,
     count: 0,
   });
 
-  // Load session & set up Broadcast sync
+  // Load session & set up Broadcast sync & Heartbeat
   useEffect(() => {
     let isMounted = true;
 
@@ -33,7 +37,9 @@ export function DisplayPage({ gameId }: DisplayPageProps) {
       }
     });
 
+    // Request initial state and announce presence to host
     syncBus.requestSync();
+    syncBus.sendPong();
 
     const unsubState = syncBus.subscribeState((updated) => {
       if (updated.id === gameId) {
@@ -55,10 +61,38 @@ export function DisplayPage({ gameId }: DisplayPageProps) {
       soundManager.play(sound);
     });
 
+    const unsubPing = syncBus.subscribePing((timestamp) => {
+      syncBus.sendPong(timestamp);
+    });
+
+    const unsubFullscreen = syncBus.subscribeRequestFullscreen(() => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    });
+
+    const unsubClose = syncBus.subscribeCloseDisplay(() => {
+      try {
+        window.close();
+      } catch (err) {
+        console.warn('Cannot close window programmatically:', err);
+      }
+    });
+
+    const unsubTimer = syncBus.subscribeTimer((timer) => {
+      setTimerState(timer);
+    });
+
     return () => {
       isMounted = false;
       unsubState();
       unsubSound();
+      unsubPing();
+      unsubFullscreen();
+      unsubClose();
+      unsubTimer();
     };
   }, [gameId]);
 
@@ -140,7 +174,7 @@ export function DisplayPage({ gameId }: DisplayPageProps) {
           <div className="w-full max-w-5xl mb-3 sm:mb-4">
             {/* Phase Context Bar */}
             <div className="flex items-center justify-between px-4 py-1 bg-gradient-to-r from-blue-950 via-[#0e2c6d] to-blue-950 border-t border-x border-feud-gold/60 rounded-t-xl text-center">
-              <span className="text-feud-goldLight text-xs sm:text-sm font-display font-extrabold tracking-widest uppercase mx-auto">
+              <span className="text-feud-goldLight text-xs sm:text-sm font-display font-extrabold tracking-widest uppercase flex-1 text-center">
                 {session.phase === GamePhase.FACEOFF
                   ? '★ FACE-OFF ROUND · CONTESTANTS BUZZ IN ★'
                   : session.phase === GamePhase.STEAL
@@ -149,6 +183,12 @@ export function DisplayPage({ gameId }: DisplayPageProps) {
                     } CAN STEAL! ⚡`
                   : `SURVEY QUESTION · ROUND ${currentRound.roundIndex + 1}`}
               </span>
+              {timerState.running && (
+                <div className="flex items-center gap-1.5 bg-red-950/90 border border-red-500 rounded-lg px-2.5 py-0.5 animate-pulse shrink-0">
+                  <span className="text-[10px] uppercase font-bold text-red-200">TIME:</span>
+                  <span className="font-mono font-black text-sm text-red-400">{timerState.remaining}s</span>
+                </div>
+              )}
             </div>
 
             {/* The Question Text Box */}
@@ -244,8 +284,8 @@ export function DisplayPage({ gameId }: DisplayPageProps) {
         {session.phase === GamePhase.FAST_MONEY && session.fastMoney && (
           <FastMoneyBoard
             fastMoney={session.fastMoney}
-            timerRemaining={session.fastMoney.player1.timerRemaining}
-            timerRunning={session.fastMoney.player1.timerRunning}
+            timerRemaining={timerState.remaining}
+            timerRunning={timerState.running}
           />
         )}
 

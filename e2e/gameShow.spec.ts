@@ -158,4 +158,64 @@ test.describe('Family Feud Game Show End-to-End Tests', () => {
     await expect(introBtn).toBeVisible();
     await introBtn.click();
   });
+
+  test('TV Display controls, answer un-reveal/hide, and multi-screen sync work correctly', async ({ page }) => {
+    // 1. Launch a new game
+    await page.goto('/#/setup');
+    await expect(page.getByText('GAME SETUP')).toBeVisible();
+    await page.getByText('START GAME NOW').click();
+
+    // 2. Host console loads
+    await expect(page.getByText('HOST CONSOLE')).toBeVisible();
+
+    // 3. Verify TV toolbar elements are present
+    await expect(page.getByText('TV Display:')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open TV Display' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Reconnect Display' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Check Status' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fullscreen TV' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Close TV Display' })).toBeVisible();
+
+    // 4. Resolve Face-Off so we are in Regular Play
+    await page.getByText('They PLAY the Board').first().click();
+    await expect(page.getByText('Controlling Team:')).toBeVisible();
+
+    // 5. Reveal an answer, then test Hide (un-reveal)
+    const revealBtns = page.getByRole('button', { name: 'Reveal', exact: true });
+    await expect(revealBtns.first()).toBeVisible();
+    await revealBtns.first().click();
+
+    // Verify "Revealed" badge and "Hide" button appear
+    await expect(page.getByText('Revealed').first()).toBeVisible();
+    const hideBtn = page.getByRole('button', { name: 'Hide' }).first();
+    await expect(hideBtn).toBeVisible();
+
+    // Click Hide and verify answer reverts to unrevealed state
+    await hideBtn.click();
+    await expect(page.getByRole('button', { name: 'Reveal', exact: true }).first()).toBeVisible();
+
+    // 6. Test Question navigation
+    const nextBtn = page.getByRole('button', { name: 'Next' });
+    await expect(nextBtn).toBeVisible();
+    await nextBtn.click();
+    // Round 2 now active
+    await expect(page.getByText('FACE-OFF ROUND 2')).toBeVisible();
+
+    const prevBtn = page.getByRole('button', { name: 'Previous' });
+    await expect(prevBtn).toBeVisible();
+    await prevBtn.click();
+    // Returned to Round 1 (which was in regular play)
+    await expect(page.getByText('Question Prompt (Round 1):')).toBeVisible();
+
+    // 7. Test End Game Confirmation Modal
+    const endGameBtn = page.getByRole('button', { name: 'End Game' });
+    await expect(endGameBtn).toBeVisible();
+    await endGameBtn.click();
+
+    await expect(page.getByText('End Game Now?')).toBeVisible();
+    await page.getByRole('button', { name: 'Yes, End Game' }).click();
+
+    // Game completed
+    await expect(page.getByText('GAME SHOW CONCLUDED!')).toBeVisible();
+  });
 });

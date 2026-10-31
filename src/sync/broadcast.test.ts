@@ -75,4 +75,59 @@ describe('BroadcastChannel Synchronization Tests', () => {
     unsub();
     remoteDisplayChannel.close();
   });
+
+  it('broadcasts and receives heartbeat ping and pong', async () => {
+    const pingSpy = vi.fn();
+    const pongSpy = vi.fn();
+    const unsubPing = syncBus.subscribePing(pingSpy);
+    const unsubPong = syncBus.subscribePong(pongSpy);
+
+    const remoteChannel = new BroadcastChannel('family-feud-sync-v1');
+    remoteChannel.postMessage({ type: 'HEARTBEAT_PING', timestamp: 12345 });
+    remoteChannel.postMessage({ type: 'HEARTBEAT_PONG', timestamp: 67890 });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(pingSpy).toHaveBeenCalledWith(12345);
+    expect(pongSpy).toHaveBeenCalledWith(67890);
+
+    unsubPing();
+    unsubPong();
+    remoteChannel.close();
+  });
+
+  it('broadcasts and receives fullscreen request and close display command', async () => {
+    const fsSpy = vi.fn();
+    const closeSpy = vi.fn();
+    const unsubFs = syncBus.subscribeRequestFullscreen(fsSpy);
+    const unsubClose = syncBus.subscribeCloseDisplay(closeSpy);
+
+    const remoteChannel = new BroadcastChannel('family-feud-sync-v1');
+    remoteChannel.postMessage({ type: 'REQUEST_FULLSCREEN' });
+    remoteChannel.postMessage({ type: 'CLOSE_DISPLAY' });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(fsSpy).toHaveBeenCalled();
+    expect(closeSpy).toHaveBeenCalled();
+
+    unsubFs();
+    unsubClose();
+    remoteChannel.close();
+  });
+
+  it('broadcasts and receives timer updates', async () => {
+    const timerSpy = vi.fn();
+    const unsub = syncBus.subscribeTimer(timerSpy);
+
+    const remoteChannel = new BroadcastChannel('family-feud-sync-v1');
+    remoteChannel.postMessage({ type: 'TIMER_UPDATE', remaining: 15, running: true });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(timerSpy).toHaveBeenCalledWith({ remaining: 15, running: true });
+
+    unsub();
+    remoteChannel.close();
+  });
 });

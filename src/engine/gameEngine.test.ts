@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   createGameSession,
   revealAnswer,
+  hideAnswer,
   revealAllRemainingAnswers,
   recordStrike,
   clearStrike,
@@ -9,12 +10,15 @@ import {
   resolveSteal,
   awardRoundBank,
   advanceToNextRound,
+  navigateToRound,
+  previousRound,
   adjustTeamScore,
   submitFastMoneyAnswer,
   revealFastMoneyAnswer,
   revealFastMoneyPoints,
   resolveFastMoney,
   restartCurrentRound,
+  endGame,
 } from './gameEngine';
 import { matchAnswer, normalizeText } from './answerMatcher';
 import { GamePhase } from '../types/game';
@@ -508,5 +512,101 @@ describe('Answer Matcher Unit Tests', () => {
     expect(res.isMatch).toBe(false);
     expect(res.matchedAnswer).toBeNull();
     expect(res.points).toBe(0);
+  });
+});
+
+describe('TV / Host Controls: hideAnswer, navigation & endGame', () => {
+  it('hides a revealed answer and deducts points from the unawarded round bank', () => {
+    let session = createGameSession({
+      id: 'g-test-nav',
+      title: 'Nav Test',
+      team1Name: 'Santos',
+      team2Name: 'Reyes',
+      config: {
+        roundsCount: 3,
+        multipliers: [1, 2, 3],
+        targetScore: 300,
+        fastMoneyTimer1: 20,
+        fastMoneyTimer2: 25,
+        fastMoneyTarget: 200,
+        faceOffTieRule: 'hostDecision',
+      },
+      regularQuestions: sampleQuestions,
+      fastMoneyQuestions: sampleQuestions,
+      packId: 'p1',
+    });
+
+    // Reveal answer a1 (35 pts)
+    session = revealAnswer(session, 'a1');
+    expect(session.rounds[0].revealedAnswerIds).toContain('a1');
+    expect(session.rounds[0].roundBank).toBe(35);
+
+    // Hide answer a1
+    session = hideAnswer(session, 'a1');
+    expect(session.rounds[0].revealedAnswerIds).not.toContain('a1');
+    expect(session.rounds[0].roundBank).toBe(0);
+  });
+
+  it('navigates directly to any round and back to previous round', () => {
+    let session = createGameSession({
+      id: 'g-test-nav-2',
+      title: 'Nav Test 2',
+      team1Name: 'Santos',
+      team2Name: 'Reyes',
+      config: {
+        roundsCount: 3,
+        multipliers: [1, 2, 3],
+        targetScore: 300,
+        fastMoneyTimer1: 20,
+        fastMoneyTimer2: 25,
+        fastMoneyTarget: 200,
+        faceOffTieRule: 'hostDecision',
+      },
+      regularQuestions: sampleQuestions,
+      fastMoneyQuestions: sampleQuestions,
+      packId: 'p1',
+    });
+
+    expect(session.currentRoundIndex).toBe(0);
+
+    // Navigate to round index 1 (Round 2)
+    session = navigateToRound(session, 1);
+    expect(session.currentRoundIndex).toBe(1);
+
+    // Navigate to previous round
+    session = previousRound(session);
+    expect(session.currentRoundIndex).toBe(0);
+
+    // Attempt out-of-bounds navigation
+    session = navigateToRound(session, 99);
+    expect(session.currentRoundIndex).toBe(0);
+  });
+
+  it('ends game directly and declares leading team champion', () => {
+    let session = createGameSession({
+      id: 'g-test-end',
+      title: 'End Test',
+      team1Name: 'Team A',
+      team2Name: 'Team B',
+      config: {
+        roundsCount: 3,
+        multipliers: [1, 2, 3],
+        targetScore: 300,
+        fastMoneyTimer1: 20,
+        fastMoneyTimer2: 25,
+        fastMoneyTarget: 200,
+        faceOffTieRule: 'hostDecision',
+      },
+      regularQuestions: sampleQuestions,
+      fastMoneyQuestions: sampleQuestions,
+      packId: 'p1',
+    });
+
+    // Adjust Team B score
+    session = adjustTeamScore(session, 'team2', 150, 'Bonus points');
+    session = endGame(session);
+
+    expect(session.phase).toBe(GamePhase.FINAL_RESULTS);
+    expect(session.winnerTeamId).toBe('team2');
   });
 });

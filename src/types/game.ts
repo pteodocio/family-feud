@@ -162,7 +162,12 @@ export interface GameSession {
 export type SyncMessage =
   | { type: 'STATE_UPDATE'; state: GameSession }
   | { type: 'TRIGGER_SOUND'; sound: SoundEffectName }
-  | { type: 'REQUEST_SYNC' };
+  | { type: 'REQUEST_SYNC' }
+  | { type: 'HEARTBEAT_PING'; timestamp: number }
+  | { type: 'HEARTBEAT_PONG'; timestamp: number }
+  | { type: 'REQUEST_FULLSCREEN' }
+  | { type: 'CLOSE_DISPLAY' }
+  | { type: 'TIMER_UPDATE'; remaining: number; running: boolean };
 
 export type SoundEffectName =
   | 'intro'

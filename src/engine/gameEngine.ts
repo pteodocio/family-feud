@@ -173,6 +173,46 @@ export function revealAnswer(session: GameSession, answerId: string): GameSessio
 }
 
 /**
+ * Un-reveals / hides a previously revealed answer (e.g., host accidentally clicked or misheard).
+ * Deducts answer points from the round bank if the bank hasn't yet been awarded to a team.
+ */
+export function hideAnswer(session: GameSession, answerId: string): GameSession {
+  const round = session.rounds[session.currentRoundIndex];
+  if (!round) return session;
+
+  if (!round.revealedAnswerIds.includes(answerId)) {
+    return session;
+  }
+
+  const answer = round.question.answers.find((a) => a.id === answerId);
+  if (!answer) return session;
+
+  const newRevealedIds = round.revealedAnswerIds.filter((id) => id !== answerId);
+  const newBank = round.isBankAwarded
+    ? round.roundBank
+    : Math.max(0, round.roundBank - answer.points);
+
+  const updatedRound: RoundState = {
+    ...round,
+    revealedAnswerIds: newRevealedIds,
+    roundBank: newBank,
+  };
+
+  const updatedRounds = [...session.rounds];
+  updatedRounds[session.currentRoundIndex] = updatedRound;
+
+  return {
+    ...session,
+    rounds: updatedRounds,
+    actionLog: [
+      ...session.actionLog,
+      `Answer hidden: "${answer.text}" (-${answer.points} pts from bank). Bank now: ${newBank}`,
+    ],
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/**
  * Reveal all remaining unrevealed answers for the current round (e.g., end-of-round board reveal).
  * Does not add points to round bank if round has concluded or is already awarded.
  */
@@ -504,6 +544,43 @@ export function advanceToNextRound(session: GameSession): GameSession {
 }
 
 /**
+ * Navigates directly to a specific regular round index (0-based) for host question navigation.
+ */
+export function navigateToRound(session: GameSession, targetRoundIndex: number): GameSession {
+  if (targetRoundIndex < 0 || targetRoundIndex >= session.rounds.length) {
+    return session;
+  }
+
+  const targetRound = session.rounds[targetRoundIndex];
+  const phase = targetRound.isBankAwarded
+    ? GamePhase.ROUND_SUMMARY
+    : targetRound.revealedAnswerIds.length > 0 || targetRound.controlTeamId
+    ? GamePhase.REGULAR
+    : GamePhase.FACEOFF;
+
+  return {
+    ...session,
+    currentRoundIndex: targetRoundIndex,
+    phase,
+    actionLog: [
+      ...session.actionLog,
+      `Host navigated to Round ${targetRoundIndex + 1} (${targetRound.multiplier}x points)`,
+    ],
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Navigates to previous round if available.
+ */
+export function previousRound(session: GameSession): GameSession {
+  if (session.currentRoundIndex > 0) {
+    return navigateToRound(session, session.currentRoundIndex - 1);
+  }
+  return session;
+}
+
+/**
  * Fast Money Answer Submission & Scoring
  */
 export function submitFastMoneyAnswer(
@@ -704,6 +781,27 @@ export function restartCurrentRound(session: GameSession): GameSession {
     team2: { ...session.team2, score: t2Score },
     rounds: updatedRounds,
     actionLog: [...session.actionLog, `Round ${session.currentRoundIndex + 1} restarted by host`],
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Concludes the game directly and transitions to FINAL_RESULTS screen.
+ */
+export function endGame(session: GameSession): GameSession {
+  const winnerTeamId =
+    session.team1.score >= session.team2.score ? session.team1.id : session.team2.id;
+  const winnerName =
+    winnerTeamId === session.team1.id ? session.team1.name : session.team2.name;
+
+  return {
+    ...session,
+    phase: GamePhase.FINAL_RESULTS,
+    winnerTeamId,
+    actionLog: [
+      ...session.actionLog,
+      `Host concluded the game. Final Champion: ${winnerName}!`,
+    ],
     updatedAt: new Date().toISOString(),
   };
 }

@@ -5,6 +5,7 @@ import { DEFAULT_SETTINGS, saveGameSession, loadGameSession, loadSettings, saveS
 import type { AppSettings } from '../db/database';
 import {
   revealAnswer as engineRevealAnswer,
+  hideAnswer as engineHideAnswer,
   revealAllRemainingAnswers as engineRevealAll,
   recordStrike as engineRecordStrike,
   clearStrike as engineClearStrike,
@@ -12,7 +13,10 @@ import {
   resolveSteal as engineResolveSteal,
   awardRoundBank as engineAwardBank,
   advanceToNextRound as engineAdvanceRound,
+  navigateToRound as engineNavigateToRound,
+  previousRound as enginePreviousRound,
   restartCurrentRound as engineRestartRound,
+  endGame as engineEndGame,
   adjustTeamScore as engineAdjustScore,
   submitFastMoneyAnswer as engineSubmitFastMoney,
   revealFastMoneyAnswer as engineRevealFastMoneyAnswer,
@@ -46,6 +50,7 @@ interface GameStoreState {
 
   // Game Engine Actions (Host)
   revealAnswer: (answerId: string) => void;
+  hideAnswer: (answerId: string) => void;
   revealAllRemainingAnswers: () => void;
   recordStrike: () => void;
   clearStrike: () => void;
@@ -53,7 +58,10 @@ interface GameStoreState {
   resolveSteal: (isSuccessful: boolean) => void;
   awardRoundBank: (teamId: string) => void;
   advanceRound: () => void;
+  navigateToRound: (targetIndex: number) => void;
+  previousRound: () => void;
   restartRound: () => void;
+  endGame: () => void;
   adjustScore: (teamId: string, delta: number, reason: string) => void;
   undo: () => void;
 
@@ -144,6 +152,21 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     get().playSound('reveal');
     // slight delay for correct chime
     setTimeout(() => get().playSound('correct'), 300);
+  },
+
+  hideAnswer: (answerId: string) => {
+    const { session, undoStack } = get();
+    if (!session) return;
+
+    const round = session.rounds[session.currentRoundIndex];
+    if (!round || !round.revealedAnswerIds.includes(answerId)) return;
+
+    const nextUndo = [...undoStack.slice(-MAX_UNDO_STACK), session];
+    const newSession = engineHideAnswer(session, answerId);
+
+    set({ session: newSession, undoStack: nextUndo });
+    saveGameSession(newSession);
+    syncBus.broadcastState(newSession);
   },
 
   revealAllRemainingAnswers: () => {
@@ -267,6 +290,32 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     }
   },
 
+  navigateToRound: (targetIndex: number) => {
+    const { session, undoStack } = get();
+    if (!session) return;
+
+    const nextUndo = [...undoStack.slice(-MAX_UNDO_STACK), session];
+    const newSession = engineNavigateToRound(session, targetIndex);
+
+    set({ session: newSession, undoStack: nextUndo });
+    saveGameSession(newSession);
+    syncBus.broadcastState(newSession);
+    get().playSound('reveal');
+  },
+
+  previousRound: () => {
+    const { session, undoStack } = get();
+    if (!session) return;
+
+    const nextUndo = [...undoStack.slice(-MAX_UNDO_STACK), session];
+    const newSession = enginePreviousRound(session);
+
+    set({ session: newSession, undoStack: nextUndo });
+    saveGameSession(newSession);
+    syncBus.broadcastState(newSession);
+    get().playSound('reveal');
+  },
+
   restartRound: () => {
     const { session, undoStack } = get();
     if (!session) return;
@@ -277,6 +326,19 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     set({ session: newSession, undoStack: nextUndo });
     saveGameSession(newSession);
     syncBus.broadcastState(newSession);
+  },
+
+  endGame: () => {
+    const { session, undoStack } = get();
+    if (!session) return;
+
+    const nextUndo = [...undoStack.slice(-MAX_UNDO_STACK), session];
+    const newSession = engineEndGame(session);
+
+    set({ session: newSession, undoStack: nextUndo });
+    saveGameSession(newSession);
+    syncBus.broadcastState(newSession);
+    get().playSound('game_win');
   },
 
   adjustScore: (teamId: string, delta: number, reason: string) => {
@@ -378,16 +440,20 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   startFastMoneyTimer: (seconds: number) => {
     set({ fastMoneyTimer: { running: true, remaining: seconds } });
+    syncBus.broadcastTimer(seconds, true);
   },
 
   pauseFastMoneyTimer: () => {
+    const remaining = get().fastMoneyTimer.remaining;
     set((prev) => ({
       fastMoneyTimer: { ...prev.fastMoneyTimer, running: false },
     }));
+    syncBus.broadcastTimer(remaining, false);
   },
 
   resetFastMoneyTimer: (seconds: number) => {
     set({ fastMoneyTimer: { running: false, remaining: seconds } });
+    syncBus.broadcastTimer(seconds, false);
   },
 
   tickFastMoneyTimer: () => {
@@ -396,10 +462,12 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     if (fastMoneyTimer.remaining <= 1) {
       set({ fastMoneyTimer: { running: false, remaining: 0 } });
+      syncBus.broadcastTimer(0, false);
       get().playSound('strike3');
     } else {
       const next = fastMoneyTimer.remaining - 1;
       set({ fastMoneyTimer: { running: true, remaining: next } });
+      syncBus.broadcastTimer(next, true);
       if (next <= 5) {
         get().playSound('countdown');
       }
