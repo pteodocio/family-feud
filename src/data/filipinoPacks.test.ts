@@ -5,18 +5,36 @@ import { db, initializeDatabase, listQuestionPacks } from '../db/database';
 import { createGameSession, revealAnswer, revealAllRemainingAnswers } from '../engine/gameEngine';
 import type { GameConfig } from '../types/game';
 
-describe('10 Filipino-Themed Built-In Question Packs Verification', () => {
+describe('Filipino-Themed Built-In Question Packs Verification', () => {
   beforeEach(async () => {
     await db.questionPacks.clear();
     await db.gameSessions.clear();
   });
 
-  it('1. registers exactly 10 Filipino question packs', () => {
-    expect(FILIPINO_BUILTIN_PACKS).toHaveLength(10);
-    expect(STARTER_PACKS.length).toBeGreaterThanOrEqual(10);
+  it('1. registers exactly 17 Filipino question packs (including 7 new packs)', () => {
+    expect(FILIPINO_BUILTIN_PACKS).toHaveLength(17);
+    expect(STARTER_PACKS.length).toBeGreaterThanOrEqual(17);
+
+    // Verify all 7 new packs are present
+    const newPackIds = [
+      'pack-certified-pinoy-moments',
+      'pack-pinoy-logic',
+      'pack-mga-linyahan-ni-mama',
+      'pack-bahay-na-bahay',
+      'pack-pinoy-diskarte-moments',
+      'pack-filipino-excuses-101',
+      'pack-pamilya-group-chat',
+    ];
+
+    newPackIds.forEach((id) => {
+      const pack = FILIPINO_BUILTIN_PACKS.find((p) => p.id === id);
+      expect(pack).toBeDefined();
+      expect(pack?.isBuiltIn).toBe(true);
+      expect(pack?.questions).toHaveLength(5);
+    });
   });
 
-  it('2. contains all 10 required categories with readable titles', () => {
+  it('2. contains all 17 required categories with readable titles', () => {
     const requiredCategories = [
       'Filipino Food & Drinks',
       'Pinoy Childhood Memories',
@@ -28,6 +46,13 @@ describe('10 Filipino-Themed Built-In Question Packs Verification', () => {
       'Philippine Geography & Trivia',
       'Funny Filipino Habits',
       'Sports & Basketball',
+      'Certified Pinoy Moments',
+      'Pinoy Logic',
+      'Mga Linyahan ni Mama',
+      'Bahay na Bahay',
+      'Pinoy Diskarte Moments',
+      'Filipino Excuses 101',
+      'Pamilya Group Chat',
     ];
 
     const actualCategories = FILIPINO_BUILTIN_PACKS.map((p) => p.category);
@@ -40,12 +65,12 @@ describe('10 Filipino-Themed Built-In Question Packs Verification', () => {
     });
   });
 
-  it('3. has exactly 50 questions in total across all 10 packs (5 per pack)', () => {
+  it('3. has exactly 85 questions in total across all 17 packs (5 per pack)', () => {
     const totalQuestions = FILIPINO_BUILTIN_PACKS.reduce(
       (sum, pack) => sum + pack.questions.length,
       0
     );
-    expect(totalQuestions).toBe(50);
+    expect(totalQuestions).toBe(85);
 
     FILIPINO_BUILTIN_PACKS.forEach((pack) => {
       expect(pack.questions).toHaveLength(5);
@@ -125,7 +150,7 @@ describe('10 Filipino-Themed Built-In Question Packs Verification', () => {
     });
   });
 
-  it('8. loads the first question and starts games correctly for each of the 10 packs', () => {
+  it('8. loads the first question and starts games correctly for each of the 17 packs', () => {
     const defaultConfig: GameConfig = {
       roundsCount: 4,
       multipliers: [1, 1, 2, 3],
@@ -197,7 +222,7 @@ describe('10 Filipino-Themed Built-In Question Packs Verification', () => {
     await initializeDatabase();
     let packs = await listQuestionPacks();
     const count1 = packs.length;
-    expect(count1).toBeGreaterThanOrEqual(10);
+    expect(count1).toBeGreaterThanOrEqual(17);
 
     // 2nd initialization (simulating restart)
     await initializeDatabase();
@@ -206,11 +231,44 @@ describe('10 Filipino-Themed Built-In Question Packs Verification', () => {
 
     expect(count2).toBe(count1);
 
-    // All 10 Filipino packs must be present
+    // All 17 Filipino packs must be present without duplicates
     FILIPINO_BUILTIN_PACKS.forEach((filipinoPack) => {
-      const found = packs.find((p) => p.id === filipinoPack.id);
-      expect(found).toBeDefined();
-      expect(found?.questions).toHaveLength(5);
+      const found = packs.filter((p) => p.id === filipinoPack.id);
+      expect(found).toHaveLength(1);
+      expect(found[0].questions).toHaveLength(5);
+    });
+  });
+
+  it('11. verifies the 7 newly added packs (11, 12, 13, 15, 16, 20, 21) have exact required structure', () => {
+    const packsToCheck = [
+      { id: 'pack-certified-pinoy-moments', title: 'Certified Pinoy Moments' },
+      { id: 'pack-pinoy-logic', title: 'Pinoy Logic' },
+      { id: 'pack-mga-linyahan-ni-mama', title: 'Mga Linyahan ni Mama' },
+      { id: 'pack-bahay-na-bahay', title: 'Bahay na Bahay' },
+      { id: 'pack-pinoy-diskarte-moments', title: 'Pinoy Diskarte Moments' },
+      { id: 'pack-filipino-excuses-101', title: 'Filipino Excuses 101' },
+      { id: 'pack-pamilya-group-chat', title: 'Pamilya Group Chat' },
+    ];
+
+    packsToCheck.forEach(({ id, title }) => {
+      const pack = FILIPINO_BUILTIN_PACKS.find((p) => p.id === id);
+      expect(pack).toBeDefined();
+      expect(pack?.title).toBe(title);
+      expect(pack?.questions).toHaveLength(5);
+
+      pack?.questions.forEach((q) => {
+        expect(q.answers.length).toBeGreaterThanOrEqual(3);
+        expect(q.answers.length).toBeLessThanOrEqual(5);
+
+        // Verify descending points order
+        for (let i = 0; i < q.answers.length - 1; i++) {
+          expect(q.answers[i].points).toBeGreaterThanOrEqual(q.answers[i + 1].points);
+        }
+
+        // Verify point total equals 100
+        const total = q.answers.reduce((sum, a) => sum + a.points, 0);
+        expect(total).toBe(100);
+      });
     });
   });
 });

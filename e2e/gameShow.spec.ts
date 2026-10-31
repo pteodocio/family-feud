@@ -81,9 +81,10 @@ test.describe('Family Feud Game Show End-to-End Tests', () => {
     await searchInput.fill('');
     await expect(page.getByText('Create Custom Pack')).toBeVisible();
 
-    // Verify all 10 Filipino packs exist in library
+    // Verify Filipino packs exist in library, including new packs
     await expect(page.getByRole('heading', { name: 'Filipino Food & Drinks' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Sports & Basketball' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Certified Pinoy Moments' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Pamilya Group Chat' })).toBeVisible();
   });
 
   test('Game Setup displays all 10 categories, previews questions, and launches Filipino pack', async ({ page }) => {
