@@ -19,6 +19,10 @@ export const QuestionSchema = z.object({
   answers: z.array(AnswerSchema).min(2, 'Must have at least 2 answers').max(10),
   tags: z.array(z.string()).optional(),
   difficulty: z.enum(['easy', 'medium', 'hard']).optional(),
+  questionType: z.string().optional(),
+  scriptureReference: z.string().optional(),
+  scriptureExplanation: z.string().optional(),
+  hostNotes: z.string().optional(),
 });
 
 export type Question = z.infer<typeof QuestionSchema>;

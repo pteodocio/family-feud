@@ -193,6 +193,8 @@ export function PackLibraryPage() {
             (q, i) => `
           <div class="question-card">
             <div class="q-title">Q${i + 1}. "${q.prompt}"</div>
+            ${q.scriptureReference ? `<div style="font-size:0.85rem; color:#b45309; font-weight:bold; margin-bottom:4px;">📖 Scripture Reference: ${q.scriptureReference} ${q.questionType ? `· Format: ${q.questionType}` : ''} ${q.difficulty ? `(${q.difficulty})` : ''}</div>` : ''}
+            ${q.scriptureExplanation ? `<div style="font-size:0.82rem; color:#4b5563; margin-bottom:8px; font-style:italic;">${q.scriptureExplanation}</div>` : ''}
             <table class="answers-table">
               <thead>
                 <tr>

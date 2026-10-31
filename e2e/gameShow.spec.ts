@@ -118,6 +118,34 @@ test.describe('Family Feud Game Show End-to-End Tests', () => {
     await expect(page.getByText('Name a famous tourist destination in the Philippines.')).toBeVisible();
   });
 
+  test('LDS Scripture Trivia packs appear in setup and host console displays scripture reference', async ({ page }) => {
+    await page.goto('/#/setup');
+    await expect(page.getByText('GAME SETUP')).toBeVisible();
+
+    // Verify Noah and the Great Flood category pill
+    const noahBtn = page.getByRole('button', { name: 'Noah and the Great Flood' });
+    await expect(noahBtn).toBeVisible();
+    await noahBtn.click();
+
+    // Check preview shows scripture badge
+    await expect(page.getByText('Pack: Noah and the Great Flood')).toBeVisible();
+    await expect(page.getByText('📖 Genesis 6:14')).toBeVisible();
+
+    // Uncheck shuffle
+    const shuffleCheckbox = page.getByRole('checkbox');
+    if (await shuffleCheckbox.isChecked()) {
+      await shuffleCheckbox.uncheck();
+    }
+
+    // Launch game
+    await page.getByText('START GAME NOW').click();
+
+    // Verify Host Console displays scripture reference and format
+    await expect(page.getByText('HOST CONSOLE')).toBeVisible();
+    await expect(page.getByText('📖 Genesis 6:14')).toBeVisible();
+    await expect(page.getByText('🏷️ Name the Object')).toBeVisible();
+  });
+
   test('Settings Page allows volume adjustment and sound testing', async ({ page }) => {
     await page.goto('/#/settings');
 

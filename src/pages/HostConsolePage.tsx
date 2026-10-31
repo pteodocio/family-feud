@@ -267,12 +267,37 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
             </div>
 
             <div className="bg-black/40 border border-blue-900 rounded-xl p-4 mb-5">
-              <span className="text-blue-300 text-xs font-bold uppercase block mb-1">
-                Question Prompt (Read Aloud to Contestants):
-              </span>
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                <span className="text-blue-300 text-xs font-bold uppercase">
+                  Question Prompt (Read Aloud to Contestants):
+                </span>
+                <div className="flex items-center gap-2 text-xs">
+                  {currentRound.question.questionType && (
+                    <span className="bg-purple-950 border border-purple-700/80 text-purple-300 px-2 py-0.5 rounded font-medium text-[11px]">
+                      🏷️ {currentRound.question.questionType}
+                    </span>
+                  )}
+                  {currentRound.question.difficulty && (
+                    <span className="bg-blue-950 border border-blue-700 text-blue-300 px-2 py-0.5 rounded uppercase font-bold text-[10px]">
+                      {currentRound.question.difficulty}
+                    </span>
+                  )}
+                  {currentRound.question.scriptureReference && (
+                    <span className="bg-amber-950/80 border border-amber-600 text-amber-300 px-2.5 py-0.5 rounded font-bold font-mono text-xs">
+                      📖 {currentRound.question.scriptureReference}
+                    </span>
+                  )}
+                </div>
+              </div>
               <h2 className="font-display font-bold text-xl sm:text-2xl text-white leading-snug">
                 "{currentRound.question.prompt}"
               </h2>
+              {currentRound.question.scriptureExplanation && (
+                <div className="mt-2.5 pt-2 border-t border-blue-900/80 text-xs text-amber-200/90 leading-relaxed bg-amber-950/30 p-2.5 rounded-lg border border-amber-900/50">
+                  <span className="font-bold text-amber-400 mr-1.5">Scripture Context / Explanation:</span>
+                  {currentRound.question.scriptureExplanation}
+                </div>
+              )}
             </div>
 
             {/* Answer Cheat Sheet for Host */}
@@ -348,23 +373,49 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
         {(session.phase === GamePhase.REGULAR || session.phase === GamePhase.STEAL) && currentRound && (
           <div className="flex flex-col gap-4">
             {/* Top Prompt Card */}
-            <div className="bg-[#071638] border-2 border-blue-800 rounded-2xl p-4 shadow-md flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <span className="text-feud-gold text-xs font-bold uppercase tracking-wider block mb-0.5">
-                  Question Prompt (Round {currentRound.roundIndex + 1}):
-                </span>
-                <h2 className="font-display font-bold text-lg sm:text-xl md:text-2xl text-white leading-snug">
-                  "{currentRound.question.prompt}"
-                </h2>
+            <div className="bg-[#071638] border-2 border-blue-800 rounded-2xl p-4 shadow-md flex flex-col gap-3">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <span className="text-feud-gold text-xs font-bold uppercase tracking-wider">
+                      Question Prompt (Round {currentRound.roundIndex + 1}):
+                    </span>
+                    {currentRound.question.questionType && (
+                      <span className="bg-purple-950 border border-purple-700/80 text-purple-300 px-2 py-0.5 rounded text-[11px] font-medium">
+                        🏷️ {currentRound.question.questionType}
+                      </span>
+                    )}
+                    {currentRound.question.difficulty && (
+                      <span className="bg-blue-950 border border-blue-700 text-blue-300 px-2 py-0.5 rounded uppercase font-bold text-[10px]">
+                        {currentRound.question.difficulty}
+                      </span>
+                    )}
+                    {currentRound.question.scriptureReference && (
+                      <span className="bg-amber-950/80 border border-amber-600 text-amber-300 px-2.5 py-0.5 rounded font-bold font-mono text-xs">
+                        📖 {currentRound.question.scriptureReference}
+                      </span>
+                    )}
+                  </div>
+                  <h2 className="font-display font-bold text-lg sm:text-xl md:text-2xl text-white leading-snug">
+                    "{currentRound.question.prompt}"
+                  </h2>
+                </div>
+
+                {/* Active Control Team Badge */}
+                <div className="bg-black/60 border border-blue-700 rounded-xl px-4 py-2 text-right shrink-0">
+                  <span className="text-gray-300 text-[10px] uppercase font-bold block">Controlling Team:</span>
+                  <span className="font-display font-extrabold text-lg text-blue-200">
+                    {currentRound.controlTeamId === session.team1.id ? session.team1.name : session.team2.name}
+                  </span>
+                </div>
               </div>
 
-              {/* Active Control Team Badge */}
-              <div className="bg-black/60 border border-blue-700 rounded-xl px-4 py-2 text-right shrink-0">
-                <span className="text-gray-300 text-[10px] uppercase font-bold block">Controlling Team:</span>
-                <span className="font-display font-extrabold text-lg text-blue-200">
-                  {currentRound.controlTeamId === session.team1.id ? session.team1.name : session.team2.name}
-                </span>
-              </div>
+              {currentRound.question.scriptureExplanation && (
+                <div className="text-xs text-amber-200/90 leading-relaxed bg-amber-950/30 p-2.5 rounded-lg border border-amber-900/50">
+                  <span className="font-bold text-amber-400 mr-1.5">Scripture Context / Explanation:</span>
+                  {currentRound.question.scriptureExplanation}
+                </div>
+              )}
             </div>
 
             {/* STEAL ALERT BANNER (If in Steal Phase) */}

@@ -336,7 +336,14 @@ export function GameSetupPage() {
                         <span className="text-feud-gold font-bold font-mono text-[11px] shrink-0">
                           {qIdx + 1}.
                         </span>
-                        <span className="leading-snug flex-1">"{q.prompt}"</span>
+                        <span className="leading-snug flex-1">
+                          "{q.prompt}"
+                          {q.scriptureReference && (
+                            <span className="ml-1.5 text-[10px] text-amber-400 font-mono font-bold bg-amber-950/60 px-1 py-0.2 rounded border border-amber-800">
+                              📖 {q.scriptureReference}
+                            </span>
+                          )}
+                        </span>
                         <span className="text-[10px] text-gray-400 font-mono shrink-0 ml-1">
                           ({q.answers.length} ans · {q.answers.reduce((s, a) => s + a.points, 0)} pts)
                         </span>
