@@ -11,29 +11,14 @@ const SOUND_FILE_MAP: Record<SoundEffectName, SoundConfig> = {
   correct: { file: '/audio/correct.wav', defaultGain: 0.9 },
   reveal: { file: '/audio/reveal.wav', defaultGain: 0.85 },
   wrong: { file: '/audio/wrong.wav', defaultGain: 0.85 },
-  score_update: { file: '/audio/score_update.wav', defaultGain: 0.75 },
-  countdown: { file: '/audio/countdown.wav', defaultGain: 0.65 },
-  timer_end: { file: '/audio/timer_end.wav', defaultGain: 1.0 },
   round_win: { file: '/audio/round_win.wav', defaultGain: 0.9 },
-  round_start: { file: '/audio/round_start.wav', defaultGain: 0.85 },
-  round_transition: { file: '/audio/round_transition.wav', defaultGain: 0.85 },
-  steal_success: { file: '/audio/steal_success.wav', defaultGain: 0.9 },
-  steal_fail: { file: '/audio/steal_fail.wav', defaultGain: 0.85 },
-  fast_money_bell: { file: '/audio/fast_money_bell.wav', defaultGain: 0.9 },
-  fast_money_buzz: { file: '/audio/fast_money_buzz.wav', defaultGain: 0.85 },
-  intro: { file: '/audio/intro.wav', defaultGain: 0.95 },
   game_win: { file: '/audio/game_win.wav', defaultGain: 1.0 },
-  game_over: { file: '/audio/game_over.wav', defaultGain: 0.9 },
-  ui_click: { file: '/audio/ui_click.wav', defaultGain: 0.4 },
-  ui_hover: { file: '/audio/ui_hover.wav', defaultGain: 0.25 },
-  ui_select: { file: '/audio/ui_select.wav', defaultGain: 0.5 },
-  ui_start: { file: '/audio/ui_start.wav', defaultGain: 0.8 },
+  intro: { file: '/audio/intro.wav', defaultGain: 0.95 },
 };
 
 const BGM_FILE_MAP: Record<Exclude<BgmTrackName, 'none'>, string> = {
-  gameplay: '/audio/bgm_gameplay.wav',
-  final: '/audio/bgm_final.wav',
-  intro: '/audio/intro.wav',
+  theme: '/audio/theme.wav',
+  gameplay: '/audio/theme.wav',
 };
 
 export class SoundManager {
@@ -125,7 +110,7 @@ export class SoundManager {
     }
   }
 
-  // Preloads the most frequent game show sounds
+  // Preloads the core game show sounds
   private preloadCoreSounds() {
     const coreList: SoundEffectName[] = [
       'strike',
@@ -133,10 +118,9 @@ export class SoundManager {
       'correct',
       'reveal',
       'wrong',
-      'score_update',
-      'countdown',
       'round_win',
-      'ui_click',
+      'game_win',
+      'intro',
     ];
 
     coreList.forEach((effect) => {
@@ -386,8 +370,6 @@ export class SoundManager {
         case 'strike':
         case 'strike3':
         case 'wrong':
-        case 'timer_end':
-        case 'fast_money_buzz':
           osc.type = 'sawtooth';
           osc.frequency.setValueAtTime(130, now);
           gain.gain.setValueAtTime(0.5, now);
@@ -400,10 +382,6 @@ export class SoundManager {
 
         case 'reveal':
         case 'correct':
-        case 'fast_money_bell':
-        case 'ui_click':
-        case 'ui_hover':
-        case 'ui_select':
           osc.type = 'sine';
           osc.frequency.setValueAtTime(880, now);
           osc.frequency.exponentialRampToValueAtTime(1760, now + 0.15);

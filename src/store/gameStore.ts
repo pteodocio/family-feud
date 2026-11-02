@@ -268,9 +268,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     syncBus.broadcastState(newSession);
 
     if (isSuccessful) {
-      get().playSound('steal_success');
+      get().playSound('round_win');
     } else {
-      get().playSound('steal_fail');
+      get().playSound('wrong');
     }
   },
 
@@ -301,13 +301,13 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     if (newSession.phase === GamePhase.FAST_MONEY) {
       get().playSound('intro');
-      get().playBgm('final');
+      get().playBgm('theme');
     } else if (newSession.phase === GamePhase.FINAL_RESULTS) {
       get().stopBgm();
       get().playSound('game_win');
     } else {
-      get().playSound('round_start');
-      get().playBgm('gameplay');
+      get().playSound('reveal');
+      get().playBgm('theme');
     }
   },
 
@@ -373,11 +373,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     set({ session: newSession, undoStack: nextUndo });
     saveGameSession(newSession);
     syncBus.broadcastState(newSession);
-    if (delta > 0) {
-      get().playSound('score_update');
-    } else {
-      get().playSound('reveal');
-    }
+    get().playSound('reveal');
   },
 
   undo: () => {
@@ -440,9 +436,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     syncBus.broadcastState(newSession);
 
     if (ans && ans.points > 0) {
-      get().playSound('fast_money_bell');
+      get().playSound('correct');
     } else {
-      get().playSound('fast_money_buzz');
+      get().playSound('wrong');
     }
   },
 
@@ -460,7 +456,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     if (newSession.fastMoney?.won) {
       get().playSound('game_win');
     } else {
-      get().playSound('steal_fail');
+      get().playSound('wrong');
     }
   },
 
@@ -489,14 +485,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     if (fastMoneyTimer.remaining <= 1) {
       set({ fastMoneyTimer: { running: false, remaining: 0 } });
       syncBus.broadcastTimer(0, false);
-      get().playSound('timer_end');
+      get().playSound('wrong');
     } else {
       const next = fastMoneyTimer.remaining - 1;
       set({ fastMoneyTimer: { running: true, remaining: next } });
       syncBus.broadcastTimer(next, true);
-      if (next <= 5) {
-        get().playSound('countdown');
-      }
     }
   },
 

@@ -14,7 +14,7 @@ function runFfmpeg(cmd) {
   execSync(cmd, { stdio: 'inherit' });
 }
 
-console.log('--- Processing Family Feud YouTube Playlist Audio ---');
+console.log('--- Processing Necessary Family Feud Game Audio ---');
 
 // 1. Intro Theme
 runFfmpeg(
@@ -23,7 +23,7 @@ runFfmpeg(
   `-ar 44100 -ac 2 -c:a pcm_s16le "${path.join(OUT_DIR, 'intro.wav')}"`
 );
 
-// 2. Strike Buzzer
+// 2. Strike Buzzer (Wrong Answer)
 runFfmpeg(
   `ffmpeg -y -i "${path.join(TEMP_DIR, '02_q5vJCYtu88k.wav')}" ` +
   `-af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-45dB,loudnorm=I=-14:TP=-1.0:LRA=7" ` +
@@ -37,151 +37,46 @@ runFfmpeg(
   `-ar 44100 -ac 2 -c:a pcm_s16le "${path.join(OUT_DIR, 'strike3.wav')}"`
 );
 
-// 4. Round Start (Face Off Rounds 1+3+4)
-runFfmpeg(
-  `ffmpeg -y -i "${path.join(TEMP_DIR, '03_l7p1kZMlvek.wav')}" ` +
-  `-af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-45dB,loudnorm=I=-15:TP=-1.0:LRA=9" ` +
-  `-ar 44100 -ac 2 -c:a pcm_s16le "${path.join(OUT_DIR, 'round_start.wav')}"`
-);
-
-// 5. Round Transition (Face Off Round 2)
-runFfmpeg(
-  `ffmpeg -y -i "${path.join(TEMP_DIR, '04_Xkp51dSOSaE.wav')}" ` +
-  `-af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-45dB,loudnorm=I=-15:TP=-1.0:LRA=9" ` +
-  `-ar 44100 -ac 2 -c:a pcm_s16le "${path.join(OUT_DIR, 'round_transition.wav')}"`
-);
-
-// 6. Round Win Celebration
+// 4. Round Win Celebration Fanfare
 runFfmpeg(
   `ffmpeg -y -i "${path.join(TEMP_DIR, '05_T0-7b0XGTSg.wav')}" ` +
   `-af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-45dB,loudnorm=I=-15:TP=-1.0:LRA=9" ` +
   `-ar 44100 -ac 2 -c:a pcm_s16le "${path.join(OUT_DIR, 'round_win.wav')}"`
 );
 
-// 7. Steal Success (Uses Round Win Stinger)
+// 5. Family Feud Theme Song (Concise 28s loop for gameplay ambience)
 runFfmpeg(
-  `ffmpeg -y -i "${path.join(TEMP_DIR, '05_T0-7b0XGTSg.wav')}" ` +
-  `-af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-45dB,loudnorm=I=-15:TP=-1.0:LRA=9" ` +
-  `-ar 44100 -ac 2 -c:a pcm_s16le "${path.join(OUT_DIR, 'steal_success.wav')}"`
+  `ffmpeg -y -i "${path.join(TEMP_DIR, '07_yj5SORZ_Y8g.wav')}" -t 28 ` +
+  `-af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-50dB,afade=t=out:st=27:d=1,loudnorm=I=-17:TP=-1.5:LRA=11" ` +
+  `-ar 44100 -ac 2 -c:a pcm_s16le "${path.join(OUT_DIR, 'theme.wav')}"`
 );
 
-// 8. Sudden Death / Final Round Music (Fast Money loop)
-runFfmpeg(
-  `ffmpeg -y -i "${path.join(TEMP_DIR, '06_4un8zHyexGQ.wav')}" ` +
-  `-af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-45dB,loudnorm=I=-16:TP=-1.5:LRA=10" ` +
-  `-ar 44100 -ac 2 -c:a pcm_s16le "${path.join(OUT_DIR, 'bgm_final.wav')}"`
-);
-
-// 9. Full Family Feud Theme Song (Gameplay BGM)
-runFfmpeg(
-  `ffmpeg -y -i "${path.join(TEMP_DIR, '07_yj5SORZ_Y8g.wav')}" ` +
-  `-af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-50dB,loudnorm=I=-17:TP=-1.5:LRA=11" ` +
-  `-ar 44100 -ac 2 -c:a pcm_s16le "${path.join(OUT_DIR, 'bgm_gameplay.wav')}"`
-);
-
-// 10. $20,000 Grand Victory Theme (Game Win)
+// 6. $20,000 Grand Victory Theme (Game Champion)
 runFfmpeg(
   `ffmpeg -y -i "${path.join(TEMP_DIR, '08_c_-mzapzLZY.wav')}" ` +
   `-af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-50dB,loudnorm=I=-14:TP=-1.0:LRA=9" ` +
   `-ar 44100 -ac 2 -c:a pcm_s16le "${path.join(OUT_DIR, 'game_win.wav')}"`
 );
 
-// 11. Ding (Correct answer confirmation)
+// 7. Ding (Board Answer Reveal Chime)
 runFfmpeg(
   `ffmpeg -y -i "${path.join(TEMP_DIR, '09_KHmDv9qZFIk.wav')}" ` +
   `-af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-45dB,loudnorm=I=-15:TP=-1.0:LRA=6" ` +
   `-ar 44100 -ac 2 -c:a pcm_s16le "${path.join(OUT_DIR, 'correct.wav')}"`
 );
 
-// 12. Fast Money Bell (Uses Board Ding)
-runFfmpeg(
-  `ffmpeg -y -i "${path.join(TEMP_DIR, '09_KHmDv9qZFIk.wav')}" ` +
-  `-af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-45dB,loudnorm=I=-15:TP=-1.0:LRA=6" ` +
-  `-ar 44100 -ac 2 -c:a pcm_s16le "${path.join(OUT_DIR, 'fast_money_bell.wav')}"`
-);
-
-// 13. You Said... (Answer Reveal)
+// 8. You Said... (Survey Says / Card Flip)
 runFfmpeg(
   `ffmpeg -y -i "${path.join(TEMP_DIR, '10_QZ_pp3TMosA.wav')}" ` +
   `-af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-45dB,loudnorm=I=-15:TP=-1.0:LRA=6" ` +
   `-ar 44100 -ac 2 -c:a pcm_s16le "${path.join(OUT_DIR, 'reveal.wav')}"`
 );
 
-// 14. Wrong Answer Buzzer
+// 9. Wrong Answer / Mistake Buzzer
 runFfmpeg(
   `ffmpeg -y -i "${path.join(TEMP_DIR, '11_aKj7G5tMWIY.wav')}" ` +
   `-af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-45dB,loudnorm=I=-14:TP=-1.0:LRA=6" ` +
   `-ar 44100 -ac 2 -c:a pcm_s16le "${path.join(OUT_DIR, 'wrong.wav')}"`
 );
 
-// 15. Timer End Klaxon (Long buzzer)
-runFfmpeg(
-  `ffmpeg -y -i "${path.join(TEMP_DIR, '11_aKj7G5tMWIY.wav')}" ` +
-  `-af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-45dB,loudnorm=I=-14:TP=-1.0:LRA=6" ` +
-  `-ar 44100 -ac 2 -c:a pcm_s16le "${path.join(OUT_DIR, 'timer_end.wav')}"`
-);
-
-// 16. Fast Money Clock Appear (Countdown / Clock Tick)
-runFfmpeg(
-  `ffmpeg -y -i "${path.join(TEMP_DIR, '12_KPl8eDBNbeg.wav')}" ` +
-  `-af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-45dB,loudnorm=I=-16:TP=-1.5:LRA=6" ` +
-  `-ar 44100 -ac 2 -c:a pcm_s16le "${path.join(OUT_DIR, 'countdown.wav')}"`
-);
-
-// 17. Try Again Buzzer (Failed steal / invalid answer / zero points)
-runFfmpeg(
-  `ffmpeg -y -i "${path.join(TEMP_DIR, '13_V8yN6XJ40IY.wav')}" ` +
-  `-af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-45dB,loudnorm=I=-14:TP=-1.0:LRA=6" ` +
-  `-ar 44100 -ac 2 -c:a pcm_s16le "${path.join(OUT_DIR, 'steal_fail.wav')}"`
-);
-
-// 18. Fast Money Buzz (Zero points answer)
-runFfmpeg(
-  `ffmpeg -y -i "${path.join(TEMP_DIR, '13_V8yN6XJ40IY.wav')}" ` +
-  `-af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-45dB,loudnorm=I=-14:TP=-1.0:LRA=6" ` +
-  `-ar 44100 -ac 2 -c:a pcm_s16le "${path.join(OUT_DIR, 'fast_money_buzz.wav')}"`
-);
-
-// 19. Next Player / Game Over Stinger
-runFfmpeg(
-  `ffmpeg -y -i "${path.join(TEMP_DIR, '14_3_CDXZIrqC8.wav')}" ` +
-  `-af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-45dB,loudnorm=I=-15:TP=-1.0:LRA=9" ` +
-  `-ar 44100 -ac 2 -c:a pcm_s16le "${path.join(OUT_DIR, 'game_over.wav')}"`
-);
-
-// 20. Score Update Ratchet / Tick (Punchy ding transient)
-runFfmpeg(
-  `ffmpeg -y -i "${path.join(TEMP_DIR, '09_KHmDv9qZFIk.wav')}" ` +
-  `-af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-45dB,atrim=0:0.18,afade=t=out:st=0.12:d=0.06,loudnorm=I=-16:TP=-1.5:LRA=4" ` +
-  `-ar 44100 -ac 2 -c:a pcm_s16le "${path.join(OUT_DIR, 'score_update.wav')}"`
-);
-
-// 21. UI Click
-runFfmpeg(
-  `ffmpeg -y -i "${path.join(TEMP_DIR, '10_QZ_pp3TMosA.wav')}" ` +
-  `-af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-45dB,atrim=0:0.06,afade=t=out:st=0.04:d=0.02,volume=0.6" ` +
-  `-ar 44100 -ac 2 -c:a pcm_s16le "${path.join(OUT_DIR, 'ui_click.wav')}"`
-);
-
-// 22. UI Hover
-runFfmpeg(
-  `ffmpeg -y -i "${path.join(TEMP_DIR, '10_QZ_pp3TMosA.wav')}" ` +
-  `-af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-45dB,atrim=0:0.04,afade=t=out:st=0.02:d=0.02,volume=0.3" ` +
-  `-ar 44100 -ac 2 -c:a pcm_s16le "${path.join(OUT_DIR, 'ui_hover.wav')}"`
-);
-
-// 23. UI Select
-runFfmpeg(
-  `ffmpeg -y -i "${path.join(TEMP_DIR, '09_KHmDv9qZFIk.wav')}" ` +
-  `-af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-45dB,atrim=0:0.35,afade=t=out:st=0.25:d=0.1,volume=0.7" ` +
-  `-ar 44100 -ac 2 -c:a pcm_s16le "${path.join(OUT_DIR, 'ui_select.wav')}"`
-);
-
-// 24. UI Game Start
-runFfmpeg(
-  `ffmpeg -y -i "${path.join(TEMP_DIR, '03_l7p1kZMlvek.wav')}" ` +
-  `-af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-45dB,atrim=0:2.0,afade=t=out:st=1.6:d=0.4,loudnorm=I=-16:TP=-1.5:LRA=6" ` +
-  `-ar 44100 -ac 2 -c:a pcm_s16le "${path.join(OUT_DIR, 'ui_start.wav')}"`
-);
-
-console.log('--- Successfully integrated all 24 TV Game Show audio files! ---');
+console.log('--- Successfully integrated the 8 necessary game sounds + 1 theme track! ---');

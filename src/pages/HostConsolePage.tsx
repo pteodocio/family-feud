@@ -313,10 +313,8 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
               updateSettings({ bgmEnabled: next });
               if (!next) {
                 stopBgm();
-              } else if (session.phase === GamePhase.FAST_MONEY) {
-                playBgm('final');
-              } else if (session.phase === GamePhase.FACEOFF || session.phase === GamePhase.REGULAR) {
-                playBgm('gameplay');
+              } else {
+                playBgm('theme');
               }
             }}
             className={`p-1.5 rounded-lg border text-xs font-bold ${

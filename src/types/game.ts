@@ -171,27 +171,13 @@ export type SyncMessage =
   | { type: 'TIMER_UPDATE'; remaining: number; running: boolean };
 
 export type SoundEffectName =
-  | 'intro'
-  | 'round_start'
-  | 'round_win'
-  | 'round_transition'
-  | 'reveal'
-  | 'correct'
-  | 'wrong'
   | 'strike'
   | 'strike3'
-  | 'score_update'
-  | 'countdown'
-  | 'timer_end'
-  | 'steal_success'
-  | 'steal_fail'
-  | 'fast_money_bell'
-  | 'fast_money_buzz'
+  | 'correct'
+  | 'reveal'
+  | 'wrong'
+  | 'round_win'
   | 'game_win'
-  | 'game_over'
-  | 'ui_click'
-  | 'ui_hover'
-  | 'ui_select'
-  | 'ui_start';
+  | 'intro';
 
-export type BgmTrackName = 'none' | 'gameplay' | 'final' | 'intro';
+export type BgmTrackName = 'none' | 'theme' | 'gameplay';
