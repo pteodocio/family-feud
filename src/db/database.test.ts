@@ -21,13 +21,10 @@ describe('Dexie Database Persistence Tests', () => {
     await db.settings.clear();
   });
 
-  it('initializes and seeds starter packs', async () => {
+  it('initializes without seeding any question packs', async () => {
     await initializeDatabase();
     const packs = await listQuestionPacks();
-    expect(packs.length).toBeGreaterThan(0);
-    const filipinoPack = packs.find((p) => p.id === 'pack-filipino-fiesta');
-    expect(filipinoPack).toBeDefined();
-    expect(filipinoPack?.isBuiltIn).toBe(true);
+    expect(packs.length).toBe(0);
   });
 
   it('saves, loads, and deletes game sessions', async () => {

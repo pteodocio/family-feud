@@ -11,6 +11,7 @@ import {
   ArrowLeft,
   CheckCircle,
   AlertCircle,
+  FolderKanban,
 } from 'lucide-react';
 import { useRouter } from '../router/Router';
 import { listQuestionPacks, saveQuestionPack, deleteQuestionPack, initializeDatabase } from '../db/database';
@@ -64,7 +65,7 @@ export function PackLibraryPage() {
     const newPack: QuestionPack = {
       id: newId,
       title: 'New Custom Survey Pack',
-      description: 'Custom family survey questions created by host.',
+      description: '',
       category: 'Custom',
       isBuiltIn: false,
       createdAt: new Date().toISOString(),
@@ -72,13 +73,11 @@ export function PackLibraryPage() {
       questions: [
         {
           id: `q_${Date.now()}_1`,
-          prompt: 'Name something you always keep in your car',
-          category: 'Everyday',
+          prompt: '',
+          category: 'Custom',
           answers: [
-            { id: `a_${Date.now()}_1`, text: 'Tissues / Wipes', points: 40, acceptedVariants: ['tissues', 'napkins'], displayOrder: 1 },
-            { id: `a_${Date.now()}_2`, text: 'Water Bottle', points: 30, acceptedVariants: ['water', 'drink'], displayOrder: 2 },
-            { id: `a_${Date.now()}_3`, text: 'Phone Charger', points: 20, acceptedVariants: ['charger', 'cable'], displayOrder: 3 },
-            { id: `a_${Date.now()}_4`, text: 'Umbrella', points: 10, acceptedVariants: [], displayOrder: 4 },
+            { id: `a_${Date.now()}_1`, text: '', points: 0, acceptedVariants: [], displayOrder: 1 },
+            { id: `a_${Date.now()}_2`, text: '', points: 0, acceptedVariants: [], displayOrder: 2 },
           ],
         },
       ],
@@ -105,10 +104,6 @@ export function PackLibraryPage() {
   };
 
   const handleDelete = async (pack: QuestionPack) => {
-    if (pack.isBuiltIn) {
-      alert('Built-in starter packs cannot be permanently deleted.');
-      return;
-    }
     if (confirm(`Are you sure you want to delete "${pack.title}"?`)) {
       await deleteQuestionPack(pack.id);
       await loadPacks();
@@ -328,81 +323,107 @@ export function PackLibraryPage() {
           </div>
         </div>
 
-        {/* PACK CARDS GRID */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredPacks.map((pack) => (
-            <div
-              key={pack.id}
-              className="bg-[#071638] border-2 border-blue-900/80 hover:border-feud-gold/70 rounded-2xl p-5 shadow-lg flex flex-col justify-between transition-all group"
-            >
-              <div>
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <h3 className="font-display font-black text-lg text-white group-hover:text-feud-gold transition-colors">
-                    {pack.title}
-                  </h3>
-                  {pack.isBuiltIn ? (
-                    <span className="bg-feud-gold/20 text-feud-gold border border-feud-gold/40 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0">
-                      ★ Built-In
-                    </span>
-                  ) : (
+        {/* PACK CARDS GRID / EMPTY STATE */}
+        {packs.length === 0 ? (
+          <div className="bg-[#071638] border-2 border-dashed border-blue-800 rounded-3xl p-8 sm:p-14 text-center max-w-xl mx-auto flex flex-col items-center justify-center shadow-lg my-6">
+            <div className="w-16 h-16 rounded-full bg-blue-950 border border-blue-700 flex items-center justify-center mb-4 text-feud-gold">
+              <FolderKanban className="w-8 h-8" />
+            </div>
+            <h2 className="font-display font-black text-2xl text-white mb-2">
+              No question packs available yet.
+            </h2>
+            <p className="text-gray-300 text-sm mb-6 max-w-md">
+              Get started by creating your own custom survey questions or importing a question pack JSON file.
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button
+                onClick={handleCreateNew}
+                className="bg-feud-gold hover:bg-feud-goldLight text-feud-dark font-black text-sm px-5 py-2.5 rounded-xl shadow-gold-glow flex items-center gap-2 transition-all active:scale-95"
+              >
+                <Plus className="w-4 h-4" />
+                Create New Pack
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="bg-blue-950 hover:bg-blue-900 border border-blue-700 text-blue-200 font-bold text-sm px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all"
+              >
+                <Upload className="w-4 h-4" />
+                Import JSON
+              </button>
+            </div>
+          </div>
+        ) : filteredPacks.length === 0 ? (
+          <div className="bg-[#071638] border border-blue-900 rounded-2xl p-8 text-center text-gray-400 text-sm my-6">
+            No question packs found matching your search or category filter.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredPacks.map((pack) => (
+              <div
+                key={pack.id}
+                className="bg-[#071638] border-2 border-blue-900/80 hover:border-feud-gold/70 rounded-2xl p-5 shadow-lg flex flex-col justify-between transition-all group"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <h3 className="font-display font-black text-lg text-white group-hover:text-feud-gold transition-colors">
+                      {pack.title}
+                    </h3>
                     <span className="bg-blue-950 text-blue-300 border border-blue-800 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0">
                       Custom
                     </span>
-                  )}
+                  </div>
+
+                  <p className="text-xs text-gray-300 line-clamp-2 mb-3">
+                    {pack.description}
+                  </p>
+
+                  <div className="flex items-center gap-2 text-[11px] text-gray-400 mb-4">
+                    <span className="bg-blue-950/80 px-2.5 py-0.5 rounded border border-blue-800 text-blue-300 font-semibold">
+                      {pack.category}
+                    </span>
+                    <span>{pack.questions.length} Questions</span>
+                  </div>
                 </div>
 
-                <p className="text-xs text-gray-300 line-clamp-2 mb-3">
-                  {pack.description}
-                </p>
-
-                <div className="flex items-center gap-2 text-[11px] text-gray-400 mb-4">
-                  <span className="bg-blue-950/80 px-2.5 py-0.5 rounded border border-blue-800 text-blue-300 font-semibold">
-                    {pack.category}
-                  </span>
-                  <span>{pack.questions.length} Questions</span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center justify-between border-t border-blue-900/60 pt-3 text-xs">
-                <button
-                  onClick={() => navigate(`/packs/${pack.id}/edit`)}
-                  className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 shadow-sm"
-                >
-                  <Edit className="w-3.5 h-3.5" />
-                  {pack.isBuiltIn ? 'View / Edit' : 'Edit'}
-                </button>
-
-                <div className="flex items-center gap-1">
-                  {/* Print Sheet */}
+                {/* Action Buttons */}
+                <div className="flex items-center justify-between border-t border-blue-900/60 pt-3 text-xs">
                   <button
-                    onClick={() => handlePrintSheet(pack)}
-                    className="p-1.5 rounded-lg bg-blue-950 hover:bg-blue-900 text-blue-300 border border-blue-800"
-                    title="Print Host Question Sheet"
+                    onClick={() => navigate(`/packs/${pack.id}/edit`)}
+                    className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 shadow-sm"
                   >
-                    <Printer className="w-3.5 h-3.5" />
+                    <Edit className="w-3.5 h-3.5" />
+                    Edit
                   </button>
 
-                  {/* Duplicate */}
-                  <button
-                    onClick={() => handleDuplicate(pack)}
-                    className="p-1.5 rounded-lg bg-blue-950 hover:bg-blue-900 text-blue-300 border border-blue-800"
-                    title="Duplicate pack"
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    {/* Print Sheet */}
+                    <button
+                      onClick={() => handlePrintSheet(pack)}
+                      className="p-1.5 rounded-lg bg-blue-950 hover:bg-blue-900 text-blue-300 border border-blue-800"
+                      title="Print Host Question Sheet"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                    </button>
 
-                  {/* Export JSON */}
-                  <button
-                    onClick={() => handleExportJson(pack)}
-                    className="p-1.5 rounded-lg bg-blue-950 hover:bg-blue-900 text-blue-300 border border-blue-800"
-                    title="Export pack to JSON"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                  </button>
+                    {/* Duplicate */}
+                    <button
+                      onClick={() => handleDuplicate(pack)}
+                      className="p-1.5 rounded-lg bg-blue-950 hover:bg-blue-900 text-blue-300 border border-blue-800"
+                      title="Duplicate pack"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
 
-                  {/* Delete (custom only) */}
-                  {!pack.isBuiltIn && (
+                    {/* Export JSON */}
+                    <button
+                      onClick={() => handleExportJson(pack)}
+                      className="p-1.5 rounded-lg bg-blue-950 hover:bg-blue-900 text-blue-300 border border-blue-800"
+                      title="Export pack to JSON"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
+
+                    {/* Delete */}
                     <button
                       onClick={() => handleDelete(pack)}
                       className="p-1.5 rounded-lg bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-900"
@@ -410,12 +431,12 @@ export function PackLibraryPage() {
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
-                  )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

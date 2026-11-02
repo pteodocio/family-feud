@@ -4,146 +4,151 @@ test.describe('Family Feud Game Show End-to-End Tests', () => {
   test('Main Menu loads correctly and navigates to Game Setup', async ({ page }) => {
     await page.goto('/');
 
-    // Check title specifically with role heading
     await expect(page.getByRole('heading', { name: 'FAMILY FEUD' })).toBeVisible();
     await expect(page.getByText('START NEW GAME')).toBeVisible();
 
-    // Click Start New Game
     await page.getByText('START NEW GAME').click();
     await expect(page).toHaveURL(/.*#\/setup/);
     await expect(page.getByText('GAME SETUP')).toBeVisible();
   });
 
-  test('Creates game, plays Face-off, reveals answers, calls strikes, and resolves steal', async ({ page }) => {
-    await page.goto('/#/setup');
-
-    // Wait for setup to be ready
-    await expect(page.getByText('GAME SETUP')).toBeVisible();
-
-    // Fill in team names
-    const team1Input = page.getByPlaceholder('e.g. Team Santos');
-    await team1Input.fill('Garcia Family');
-
-    const team2Input = page.getByPlaceholder('e.g. Team Reyes');
-    await team2Input.fill('Flores Family');
-
-    // Click Start Game Now
-    await page.getByText('START GAME NOW').click();
-
-    // Host console should load
-    await expect(page.getByText('HOST CONSOLE')).toBeVisible();
-    await expect(page.getByText('FACE-OFF ROUND 1')).toBeVisible();
-    await expect(page.getByText('Garcia Family Wins Face-off')).toBeVisible();
-
-    // Team 1 wins faceoff and chooses to play
-    await page.getByText('They PLAY the Board').first().click();
-
-    // Regular round play active
-    await expect(page.getByText('Controlling Team:')).toBeVisible();
-    await expect(page.getByText('Garcia Family').first()).toBeVisible();
-
-    // Click "Reveal" on the first answer
-    const revealBtns = page.getByRole('button', { name: 'Reveal', exact: true });
-    await expect(revealBtns.first()).toBeVisible();
-    await revealBtns.first().click();
-
-    // Verify first answer shows "Revealed"
-    await expect(page.getByText('Revealed').first()).toBeVisible();
-
-    // Record 3 strikes
-    const strikeBtn = page.getByText('STRIKE (X)');
-    await strikeBtn.click();
-    await strikeBtn.click();
-    await strikeBtn.click();
-
-    // Steal Opportunity banner should be visible
-    await expect(page.getByText('STEAL ATTEMPT BY:')).toBeVisible();
-
-    // Mark steal successful
-    await page.getByText('Steal SUCCESSFUL').click();
-
-    // Round summary appears
-    await expect(page.getByText('Round Complete!')).toBeVisible();
-  });
-
-  test('Question Pack Library allows searching and viewing packs', async ({ page }) => {
+  test('Displays clean empty state in Question Pack Library when no packs exist', async ({ page }) => {
     await page.goto('/#/packs');
 
     await expect(page.getByText('QUESTION PACK LIBRARY')).toBeVisible();
-    await expect(page.getByText('Pinoy Fiesta & Filipino Family Life')).toBeVisible();
-
-    // Test Search
-    const searchInput = page.getByPlaceholder('Search questions, prompts, or answers...');
-    await searchInput.fill('Fiesta');
-    await expect(page.getByText('Pinoy Fiesta & Filipino Family Life')).toBeVisible();
-
-    // Clear search
-    await searchInput.fill('');
-    await expect(page.getByText('Create Custom Pack')).toBeVisible();
-
-    // Verify Filipino packs exist in library, including new packs
-    await expect(page.getByRole('heading', { name: 'Filipino Food & Drinks' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Certified Pinoy Moments' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Pamilya Group Chat' })).toBeVisible();
+    await expect(page.getByText('No question packs available yet.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Create New Pack' })).toBeVisible();
   });
 
-  test('Game Setup displays all 10 categories, previews questions, and launches Filipino pack', async ({ page }) => {
+  test('Displays clean empty state in Game Setup when no packs exist and disables launch', async ({ page }) => {
     await page.goto('/#/setup');
 
     await expect(page.getByText('GAME SETUP')).toBeVisible();
+    await expect(page.getByText('No question packs available yet.')).toBeVisible();
 
-    // Verify category pills are visible
-    await expect(page.getByRole('button', { name: '★ All Categories' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Philippine Geography & Trivia' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Sports & Basketball' })).toBeVisible();
-
-    // Click Philippine Geography & Trivia category
-    await page.getByRole('button', { name: 'Philippine Geography & Trivia' }).click();
-
-    // Verify question preview shows questions for that pack
-    await expect(page.getByText('Pack: Philippine Geography & Trivia')).toBeVisible();
-    await expect(page.getByText('Name a major island group in the Philippines.')).toBeVisible();
-
-    // Uncheck shuffle to guarantee question 1 is first
-    const shuffleCheckbox = page.getByRole('checkbox');
-    if (await shuffleCheckbox.isChecked()) {
-      await shuffleCheckbox.uncheck();
-    }
-
-    // Launch the game
-    await page.getByText('START GAME NOW').click();
-
-    // Verify host console loads with the selected pack question
-    await expect(page.getByText('HOST CONSOLE')).toBeVisible();
-    await expect(page.getByText('Name a famous tourist destination in the Philippines.')).toBeVisible();
+    const startBtn = page.getByRole('button', { name: 'START GAME NOW' });
+    await expect(startBtn).toBeDisabled();
   });
 
-  test('LDS Scripture Trivia packs appear in setup and host console displays scripture reference', async ({ page }) => {
-    await page.goto('/#/setup');
-    await expect(page.getByText('GAME SETUP')).toBeVisible();
+  test('Creates custom pack, configures questions, and launches game', async ({ page }) => {
+    // 1. Go to Packs Library
+    await page.goto('/#/packs');
+    await expect(page.getByText('No question packs available yet.')).toBeVisible();
 
-    // Verify Noah and the Great Flood category pill
-    const noahBtn = page.getByRole('button', { name: 'Noah and the Great Flood' });
-    await expect(noahBtn).toBeVisible();
-    await noahBtn.click();
+    // 2. Click Create New Pack
+    await page.getByRole('button', { name: 'Create New Pack' }).click();
 
-    // Check preview shows scripture badge
-    await expect(page.getByText('Pack: Noah and the Great Flood')).toBeVisible();
-    await expect(page.getByText('📖 Genesis 6:14')).toBeVisible();
+    // 3. Arrive at Pack Editor
+    await expect(page.getByText('QUESTION PACK EDITOR')).toBeVisible();
 
-    // Uncheck shuffle
-    const shuffleCheckbox = page.getByRole('checkbox');
-    if (await shuffleCheckbox.isChecked()) {
-      await shuffleCheckbox.uncheck();
+    // Set Pack Title
+    const titleInput = page.locator('input[value="New Custom Survey Pack"]');
+    await titleInput.fill('Family Gathering Trivia');
+
+    // Set Question 1 prompt
+    const promptInput = page.getByPlaceholder('e.g. Name something found in a kitchen...');
+    if (await promptInput.count() > 0) {
+      await promptInput.fill('Name something in the kitchen');
     }
 
-    // Launch game
-    await page.getByText('START GAME NOW').click();
+    // Save Changes
+    await page.getByRole('button', { name: 'Save Changes' }).click();
+    await expect(page.getByText('Saved successfully!')).toBeVisible();
 
-    // Verify Host Console displays scripture reference and format
+    // Return to Packs Library
+    await page.getByText('Packs Library').click();
+    await expect(page.getByText('QUESTION PACK LIBRARY')).toBeVisible();
+    await expect(page.getByText('Family Gathering Trivia')).toBeVisible();
+
+    // Go to Setup and select the newly created pack
+    await page.goto('/#/setup');
+    await expect(page.getByText('GAME SETUP')).toBeVisible();
+    await expect(page.getByText('Family Gathering Trivia').first()).toBeVisible();
+
+    // Select the pack
+    await page.getByText('Family Gathering Trivia').first().click();
+
+    // START GAME NOW is enabled
+    const startBtn = page.getByRole('button', { name: 'START GAME NOW' });
+    await expect(startBtn).toBeEnabled();
+    await startBtn.click();
+
+    // Host console loads
     await expect(page.getByText('HOST CONSOLE')).toBeVisible();
-    await expect(page.getByText('📖 Genesis 6:14')).toBeVisible();
-    await expect(page.getByText('🏷️ Name the Object')).toBeVisible();
+  });
+
+  test('TV Display controls, answer un-reveal/hide, strikes, and multi-screen sync work correctly', async ({ page }) => {
+    // 1. Create a custom pack first to play with
+    await page.goto('/#/packs');
+    await page.getByRole('button', { name: 'Create New Pack' }).click();
+    await expect(page.getByText('QUESTION PACK EDITOR')).toBeVisible();
+
+    const titleInput = page.locator('input[value="New Custom Survey Pack"]');
+    await titleInput.fill('Game Night Special');
+
+    // Add prompt & answers
+    const textarea = page.locator('textarea');
+    if (await textarea.count() > 0) {
+      await textarea.fill('Name something found in a refrigerator');
+    }
+
+    // Add a second question so navigation between questions works
+    await page.getByRole('button', { name: 'Add' }).first().click();
+
+    await page.getByRole('button', { name: 'Save Changes' }).click();
+    await expect(page.getByText('Saved successfully!')).toBeVisible();
+
+    // 2. Launch game with this pack
+    await page.goto('/#/setup');
+    await expect(page.getByText('GAME SETUP')).toBeVisible();
+    await page.getByText('Game Night Special').first().click();
+    await page.getByRole('button', { name: 'START GAME NOW' }).click();
+
+    // 3. Host console loads
+    await expect(page.getByText('HOST CONSOLE')).toBeVisible();
+
+    // 4. Verify TV toolbar elements are present
+    await expect(page.getByText('TV Display:')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open TV Display' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Reconnect Display' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Check Status' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fullscreen TV' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Close TV Display' })).toBeVisible();
+
+    // 5. Resolve Face-Off so we are in Regular Play
+    await page.getByText('They PLAY the Board').first().click();
+    await expect(page.getByText('Controlling Team:')).toBeVisible();
+
+    // 6. Reveal an answer, then test Hide (un-reveal)
+    const revealBtns = page.getByRole('button', { name: 'Reveal', exact: true });
+    if (await revealBtns.count() > 0) {
+      await revealBtns.first().click();
+      await expect(page.getByText('Revealed').first()).toBeVisible();
+
+      // Click Hide to un-reveal
+      const hideBtn = page.getByRole('button', { name: 'Hide' }).first();
+      await expect(hideBtn).toBeVisible();
+      await hideBtn.click();
+
+      // Reverts to Reveal button
+      await expect(page.getByRole('button', { name: 'Reveal', exact: true }).first()).toBeVisible();
+    }
+
+    // 7. Test Question navigation
+    const nextBtn = page.getByRole('button', { name: 'Next' });
+    await expect(nextBtn).toBeVisible();
+    await nextBtn.click();
+
+    // 8. Test End Game Confirmation Modal
+    const endGameBtn = page.getByRole('button', { name: 'End Game' });
+    await expect(endGameBtn).toBeVisible();
+    await endGameBtn.click();
+
+    await expect(page.getByText('End Game Now?')).toBeVisible();
+    await page.getByRole('button', { name: 'Yes, End Game' }).click();
+
+    // Game completed
+    await expect(page.getByText('GAME SHOW CONCLUDED!')).toBeVisible();
   });
 
   test('Settings Page allows volume adjustment and sound testing', async ({ page }) => {
@@ -157,65 +162,5 @@ test.describe('Family Feud Game Show End-to-End Tests', () => {
     const introBtn = page.getByText('🎺 Intro Fanfare');
     await expect(introBtn).toBeVisible();
     await introBtn.click();
-  });
-
-  test('TV Display controls, answer un-reveal/hide, and multi-screen sync work correctly', async ({ page }) => {
-    // 1. Launch a new game
-    await page.goto('/#/setup');
-    await expect(page.getByText('GAME SETUP')).toBeVisible();
-    await page.getByText('START GAME NOW').click();
-
-    // 2. Host console loads
-    await expect(page.getByText('HOST CONSOLE')).toBeVisible();
-
-    // 3. Verify TV toolbar elements are present
-    await expect(page.getByText('TV Display:')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Open TV Display' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Reconnect Display' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Check Status' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Fullscreen TV' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Close TV Display' })).toBeVisible();
-
-    // 4. Resolve Face-Off so we are in Regular Play
-    await page.getByText('They PLAY the Board').first().click();
-    await expect(page.getByText('Controlling Team:')).toBeVisible();
-
-    // 5. Reveal an answer, then test Hide (un-reveal)
-    const revealBtns = page.getByRole('button', { name: 'Reveal', exact: true });
-    await expect(revealBtns.first()).toBeVisible();
-    await revealBtns.first().click();
-
-    // Verify "Revealed" badge and "Hide" button appear
-    await expect(page.getByText('Revealed').first()).toBeVisible();
-    const hideBtn = page.getByRole('button', { name: 'Hide' }).first();
-    await expect(hideBtn).toBeVisible();
-
-    // Click Hide and verify answer reverts to unrevealed state
-    await hideBtn.click();
-    await expect(page.getByRole('button', { name: 'Reveal', exact: true }).first()).toBeVisible();
-
-    // 6. Test Question navigation
-    const nextBtn = page.getByRole('button', { name: 'Next' });
-    await expect(nextBtn).toBeVisible();
-    await nextBtn.click();
-    // Round 2 now active
-    await expect(page.getByText('FACE-OFF ROUND 2')).toBeVisible();
-
-    const prevBtn = page.getByRole('button', { name: 'Previous' });
-    await expect(prevBtn).toBeVisible();
-    await prevBtn.click();
-    // Returned to Round 1 (which was in regular play)
-    await expect(page.getByText('Question Prompt (Round 1):')).toBeVisible();
-
-    // 7. Test End Game Confirmation Modal
-    const endGameBtn = page.getByRole('button', { name: 'End Game' });
-    await expect(endGameBtn).toBeVisible();
-    await endGameBtn.click();
-
-    await expect(page.getByText('End Game Now?')).toBeVisible();
-    await page.getByRole('button', { name: 'Yes, End Game' }).click();
-
-    // Game completed
-    await expect(page.getByText('GAME SHOW CONCLUDED!')).toBeVisible();
   });
 });

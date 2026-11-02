@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Play, ArrowLeft, Shuffle, Check, Settings2 } from 'lucide-react';
+import { Play, ArrowLeft, Shuffle, Check, Settings2, FolderKanban, Plus } from 'lucide-react';
 import { useRouter } from '../router/Router';
 import { useGameStore } from '../store/gameStore';
 import { listQuestionPacks, loadSettings, saveGameSession, initializeDatabase } from '../db/database';
@@ -250,107 +250,130 @@ export function GameSetupPage() {
             <div className="bg-[#071638] border border-blue-900 rounded-2xl p-4 shadow-md flex-1 flex flex-col">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-bold uppercase text-feud-gold">
-                  Select Question Pack ({filteredPacks.length} shown of {packs.length})
+                  Select Question Pack {packs.length > 0 && `(${filteredPacks.length} shown of ${packs.length})`}
                 </span>
               </div>
 
-              {/* Category Filter Pills (Displays all categories including the 10 Filipino categories) */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-2.5 mb-2 scrollbar-thin">
-                {categories.map((cat) => (
+              {packs.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center border-2 border-dashed border-blue-800 rounded-xl my-4">
+                  <div className="w-12 h-12 rounded-full bg-blue-950 border border-blue-700 flex items-center justify-center mb-3 text-feud-gold">
+                    <FolderKanban className="w-6 h-6" />
+                  </div>
+                  <h3 className="font-display font-black text-lg text-white mb-1">
+                    No question packs available yet.
+                  </h3>
+                  <p className="text-gray-300 text-xs mb-4 max-w-xs">
+                    Please create or import a question pack before starting a game.
+                  </p>
                   <button
-                    key={cat}
                     type="button"
-                    onClick={() => {
-                      setSelectedCategory(cat);
-                      const matching = packs.filter((p) => cat === 'all' || p.category === cat);
-                      if (matching.length > 0 && !matching.some((m) => m.id === selectedPackId)) {
-                        setSelectedPackId(matching[0].id);
-                      }
-                    }}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
-                      selectedCategory === cat
-                        ? 'bg-feud-gold text-[#071638] shadow-sm'
-                        : 'bg-blue-950/80 hover:bg-blue-900 text-blue-200 border border-blue-800/80'
-                    }`}
+                    onClick={() => navigate('/packs')}
+                    className="bg-feud-gold hover:bg-feud-goldLight text-feud-dark font-black text-xs px-4 py-2 rounded-xl shadow-gold-glow flex items-center gap-1.5 transition-all active:scale-95"
                   >
-                    {cat === 'all' ? '★ All Categories' : cat}
+                    <Plus className="w-4 h-4" />
+                    Create New Pack
                   </button>
-                ))}
-              </div>
+                </div>
+              ) : (
+                <>
+                  {/* Category Filter Pills */}
+                  {categories.length > 1 && (
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-2.5 mb-2 scrollbar-thin">
+                      {categories.map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCategory(cat);
+                            const matching = packs.filter((p) => cat === 'all' || p.category === cat);
+                            if (matching.length > 0 && !matching.some((m) => m.id === selectedPackId)) {
+                              setSelectedPackId(matching[0].id);
+                            }
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
+                            selectedCategory === cat
+                              ? 'bg-feud-gold text-[#071638] shadow-sm'
+                              : 'bg-blue-950/80 hover:bg-blue-900 text-blue-200 border border-blue-800/80'
+                          }`}
+                        >
+                          {cat === 'all' ? '★ All Categories' : cat}
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
-              {/* Pack list */}
-              <div className="flex-1 flex flex-col gap-2.5 overflow-y-auto max-h-[260px] pr-1">
-                {filteredPacks.map((pack) => {
-                  const isSelected = pack.id === selectedPackId;
-                  return (
-                    <div
-                      key={pack.id}
-                      onClick={() => setSelectedPackId(pack.id)}
-                      className={`p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                        isSelected
-                          ? 'bg-[#0f2c69] border-feud-gold shadow-gold-glow'
-                          : 'bg-[#05112e] border-blue-900 hover:border-blue-700'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-bold text-sm text-white">{pack.title}</span>
-                        {isSelected && <Check className="w-4 h-4 text-feud-gold shrink-0" />}
-                      </div>
-                      <p className="text-xs text-gray-300 line-clamp-2 mb-2">
-                        {pack.description}
-                      </p>
-                      <div className="flex items-center gap-2 text-[10px]">
-                        <span className="bg-blue-950 px-2 py-0.5 rounded border border-blue-800 text-blue-300 font-semibold">
-                          {pack.category}
+                  {/* Pack list */}
+                  {filteredPacks.length === 0 ? (
+                    <div className="flex-1 flex items-center justify-center p-6 text-center text-gray-400 text-xs">
+                      No question packs match the selected category.
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex flex-col gap-2.5 overflow-y-auto max-h-[260px] pr-1">
+                      {filteredPacks.map((pack) => {
+                        const isSelected = pack.id === selectedPackId;
+                        return (
+                          <div
+                            key={pack.id}
+                            onClick={() => setSelectedPackId(pack.id)}
+                            className={`p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                              isSelected
+                                ? 'bg-[#0f2c69] border-feud-gold shadow-gold-glow'
+                                : 'bg-[#05112e] border-blue-900 hover:border-blue-700'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-bold text-sm text-white">{pack.title}</span>
+                              {isSelected && <Check className="w-4 h-4 text-feud-gold shrink-0" />}
+                            </div>
+                            <p className="text-xs text-gray-300 line-clamp-2 mb-2">
+                              {pack.description}
+                            </p>
+                            <div className="flex items-center gap-2 text-[10px]">
+                              <span className="bg-blue-950 px-2 py-0.5 rounded border border-blue-800 text-blue-300 font-semibold">
+                                {pack.category}
+                              </span>
+                              <span className="text-gray-300 font-mono">{pack.questions.length} Questions</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Question Preview for Selected Pack */}
+                  {selectedPack && (
+                    <div className="bg-[#040e24] border border-blue-800/80 rounded-xl p-3 mt-3">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[11px] font-bold text-feud-gold uppercase tracking-wider">
+                          Question Preview ({selectedPack.questions.length} Questions):
                         </span>
-                        <span className="text-gray-300 font-mono">{pack.questions.length} Questions</span>
-                        {pack.isBuiltIn ? (
-                          <span className="text-feud-gold bg-amber-950/80 border border-amber-600/80 px-1.5 py-0.5 rounded font-bold">
-                            ★ Built-In
-                          </span>
-                        ) : (
-                          <span className="text-emerald-400 bg-emerald-950/80 border border-emerald-600/80 px-1.5 py-0.5 rounded font-bold">
-                            ✎ Custom
-                          </span>
-                        )}
+                        <span className="text-[10px] text-blue-300 font-mono">
+                          Pack: {selectedPack.title}
+                        </span>
+                      </div>
+                      <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1 text-xs">
+                        {selectedPack.questions.map((q, qIdx) => (
+                          <div key={q.id} className="flex items-start gap-1.5 text-gray-200">
+                            <span className="text-feud-gold font-bold font-mono text-[11px] shrink-0">
+                              {qIdx + 1}.
+                            </span>
+                            <span className="leading-snug flex-1">
+                              "{q.prompt}"
+                              {q.scriptureReference && (
+                                <span className="ml-1.5 text-[10px] text-amber-400 font-mono font-bold bg-amber-950/60 px-1 py-0.2 rounded border border-amber-800">
+                                  📖 {q.scriptureReference}
+                                </span>
+                              )}
+                            </span>
+                            <span className="text-[10px] text-gray-400 font-mono shrink-0 ml-1">
+                              ({q.answers.length} ans · {q.answers.reduce((s, a) => s + a.points, 0)} pts)
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-
-              {/* Question Preview for Selected Pack */}
-              {selectedPack && (
-                <div className="bg-[#040e24] border border-blue-800/80 rounded-xl p-3 mt-3">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[11px] font-bold text-feud-gold uppercase tracking-wider">
-                      Question Preview ({selectedPack.questions.length} Questions):
-                    </span>
-                    <span className="text-[10px] text-blue-300 font-mono">
-                      Pack: {selectedPack.title}
-                    </span>
-                  </div>
-                  <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1 text-xs">
-                    {selectedPack.questions.map((q, qIdx) => (
-                      <div key={q.id} className="flex items-start gap-1.5 text-gray-200">
-                        <span className="text-feud-gold font-bold font-mono text-[11px] shrink-0">
-                          {qIdx + 1}.
-                        </span>
-                        <span className="leading-snug flex-1">
-                          "{q.prompt}"
-                          {q.scriptureReference && (
-                            <span className="ml-1.5 text-[10px] text-amber-400 font-mono font-bold bg-amber-950/60 px-1 py-0.2 rounded border border-amber-800">
-                              📖 {q.scriptureReference}
-                            </span>
-                          )}
-                        </span>
-                        <span className="text-[10px] text-gray-400 font-mono shrink-0 ml-1">
-                          ({q.answers.length} ans · {q.answers.reduce((s, a) => s + a.points, 0)} pts)
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -359,13 +382,22 @@ export function GameSetupPage() {
         {/* LAUNCH BUTTON BAR */}
         <div className="bg-[#071638] border-2 border-feud-gold rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-gold-glow">
           <div className="text-xs text-gray-300">
-            Selected: <span className="font-bold text-white">{selectedPack?.title}</span> (
-            {selectedPack?.questions.length} questions) · Ready for TV and Laptop
+            {selectedPack ? (
+              <>
+                Selected: <span className="font-bold text-white">{selectedPack.title}</span> (
+                {selectedPack.questions.length} questions) · Ready for TV and Laptop
+              </>
+            ) : (
+              <span className="text-amber-400 font-semibold">
+                No question pack selected. Create or import a question pack to begin.
+              </span>
+            )}
           </div>
 
           <button
             onClick={handleLaunch}
-            className="w-full sm:w-auto bg-gradient-to-r from-feud-gold via-feud-goldLight to-feud-gold hover:brightness-110 text-feud-dark font-display font-black text-xl py-3 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-95"
+            disabled={!selectedPack || selectedPack.questions.length === 0}
+            className="w-full sm:w-auto bg-gradient-to-r from-feud-gold via-feud-goldLight to-feud-gold hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed text-feud-dark font-display font-black text-xl py-3 px-8 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-95"
           >
             <Play className="w-5 h-5 fill-current" />
             START GAME NOW

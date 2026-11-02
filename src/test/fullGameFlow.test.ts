@@ -13,9 +13,65 @@ import {
   resolveFastMoney,
 } from '../engine/gameEngine';
 import { saveGameSession, loadGameSession, db } from '../db/database';
-import { STARTER_PACKS } from '../data/starterPacks';
 import { GamePhase } from '../types/game';
-import type { GameSession, GameConfig } from '../types/game';
+import type { GameSession, GameConfig, Question } from '../types/game';
+
+const testQuestions: Question[] = [
+  {
+    id: 't-q1',
+    prompt: 'Name a food you expect to see on the table at a family gathering',
+    category: 'Food',
+    answers: [
+      { id: 't-a1', text: 'Roast Pig', points: 42, acceptedVariants: ['pig'], displayOrder: 1 },
+      { id: 't-a2', text: 'Spring Rolls', points: 26, acceptedVariants: ['rolls'], displayOrder: 2 },
+      { id: 't-a3', text: 'Noodles', points: 16, acceptedVariants: ['noodles'], displayOrder: 3 },
+      { id: 't-a4', text: 'Fried Chicken', points: 16, acceptedVariants: ['chicken'], displayOrder: 4 },
+    ],
+  },
+  {
+    id: 't-q2',
+    prompt: 'Name a classic song people love to sing at karaoke',
+    category: 'Entertainment',
+    answers: [
+      { id: 't-a5', text: 'My Way', points: 38, acceptedVariants: ['my way'], displayOrder: 1 },
+      { id: 't-a6', text: 'Total Eclipse', points: 24, acceptedVariants: ['eclipse'], displayOrder: 2 },
+      { id: 't-a7', text: 'Dancing Queen', points: 20, acceptedVariants: ['dancing'], displayOrder: 3 },
+      { id: 't-a8', text: 'Sweet Caroline', points: 18, acceptedVariants: ['sweet'], displayOrder: 4 },
+    ],
+  },
+  {
+    id: 't-q3',
+    prompt: 'Name a souvenir brought back from a trip',
+    category: 'Travel',
+    answers: [
+      { id: 't-a9', text: 'Dried Mangoes', points: 40, acceptedVariants: ['mangoes'], displayOrder: 1 },
+      { id: 't-a10', text: 'T-Shirts', points: 25, acceptedVariants: ['shirt'], displayOrder: 2 },
+      { id: 't-a11', text: 'Keychains', points: 20, acceptedVariants: ['keychain'], displayOrder: 3 },
+      { id: 't-a12', text: 'Magnets', points: 15, acceptedVariants: ['magnet'], displayOrder: 4 },
+    ],
+  },
+  {
+    id: 't-q4',
+    prompt: 'Name something every mom warns her kids about',
+    category: 'Family',
+    answers: [
+      { id: 't-a13', text: 'Going to bed with wet hair', points: 44, acceptedVariants: ['wet hair'], displayOrder: 1 },
+      { id: 't-a14', text: 'Staying out late', points: 26, acceptedVariants: ['late'], displayOrder: 2 },
+      { id: 't-a15', text: 'Not eating vegetables', points: 18, acceptedVariants: ['veggies'], displayOrder: 3 },
+      { id: 't-a16', text: 'Sitting too close to the TV', points: 12, acceptedVariants: ['tv'], displayOrder: 4 },
+    ],
+  },
+  {
+    id: 't-q5',
+    prompt: 'Name an excuse for being late to a meeting',
+    category: 'Work',
+    answers: [
+      { id: 't-a17', text: 'Heavy Traffic', points: 50, acceptedVariants: ['traffic'], displayOrder: 1 },
+      { id: 't-a18', text: 'Overslept', points: 30, acceptedVariants: ['alarm'], displayOrder: 2 },
+      { id: 't-a19', text: 'Car Trouble', points: 20, acceptedVariants: ['car'], displayOrder: 3 },
+    ],
+  },
+];
 
 describe('Complete Full Game Show Flow Integration Test', () => {
   beforeEach(async () => {
@@ -23,9 +79,6 @@ describe('Complete Full Game Show Flow Integration Test', () => {
   });
 
   it('plays through a full 4-round game into Fast Money and final victory', async () => {
-    const starterPack = STARTER_PACKS.find((p) => p.id === 'pack-filipino-fiesta')!;
-    expect(starterPack.questions.length).toBeGreaterThanOrEqual(4);
-
     const config: GameConfig = {
       roundsCount: 4,
       multipliers: [1, 1, 2, 3],
@@ -43,9 +96,9 @@ describe('Complete Full Game Show Flow Integration Test', () => {
       team1Name: 'Santos Family',
       team2Name: 'Reyes Family',
       config,
-      regularQuestions: starterPack.questions.slice(0, 4),
-      fastMoneyQuestions: starterPack.questions.slice(0, 5),
-      packId: starterPack.id,
+      regularQuestions: testQuestions.slice(0, 4),
+      fastMoneyQuestions: testQuestions.slice(0, 5),
+      packId: 'test-pack-custom',
     });
 
     expect(session.phase).toBe(GamePhase.FACEOFF);

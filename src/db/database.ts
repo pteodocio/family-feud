@@ -1,6 +1,5 @@
 import Dexie, { type Table } from 'dexie';
 import type { GameSession, QuestionPack, GameConfig } from '../types/game';
-import { STARTER_PACKS } from '../data/starterPacks';
 
 export interface AppSettings {
   id: string; // 'global_settings'
@@ -58,21 +57,18 @@ export class FeudDatabase extends Dexie {
 export const db = new FeudDatabase();
 
 /**
- * Initializes database and seeds starter packs if not present.
- * Ensures built-in packs remain accessible even after offline use or resets.
+ * Initializes database and ensures default settings exist.
+ * Does not seed any default packs (all packs removed).
+ * Automatically purges any previously stored packs once.
  */
 export async function initializeDatabase(): Promise<void> {
   try {
-    const existingPacks = await db.questionPacks.count();
-    if (existingPacks === 0) {
-      await db.questionPacks.bulkPut(STARTER_PACKS);
-    } else {
-      // Ensure built-in packs are present
-      for (const starter of STARTER_PACKS) {
-        const found = await db.questionPacks.get(starter.id);
-        if (!found) {
-          await db.questionPacks.put(starter);
-        }
+    const purgeKey = 'feud_packs_purged_v3';
+    const isPurged = typeof window !== 'undefined' ? window.localStorage?.getItem(purgeKey) : null;
+    if (!isPurged) {
+      await db.questionPacks.clear();
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(purgeKey, 'true');
       }
     }
 
@@ -138,20 +134,10 @@ export async function deleteGameSession(id: string): Promise<void> {
 export async function listQuestionPacks(): Promise<QuestionPack[]> {
   try {
     const packs = await db.questionPacks.toArray();
-    if (packs.length === 0) {
-      return STARTER_PACKS;
-    }
-    // Stable order: starter packs in defined order, followed by custom packs
-    const starterOrder = new Map(STARTER_PACKS.map((p, idx) => [p.id, idx]));
-    return packs.sort((a, b) => {
-      const orderA = starterOrder.has(a.id) ? (starterOrder.get(a.id) as number) : 999;
-      const orderB = starterOrder.has(b.id) ? (starterOrder.get(b.id) as number) : 999;
-      if (orderA !== orderB) return orderA - orderB;
-      return a.title.localeCompare(b.title);
-    });
+    return packs.sort((a, b) => a.title.localeCompare(b.title));
   } catch (err) {
     console.error('Failed to list question packs:', err);
-    return STARTER_PACKS;
+    return [];
   }
 }
 
@@ -171,15 +157,11 @@ export async function loadQuestionPack(id: string): Promise<QuestionPack | undef
 }
 
 /**
- * Deletes a question pack. Built-in packs are reseeded or protected.
+ * Deletes a question pack.
  */
 export async function deleteQuestionPack(id: string): Promise<boolean> {
   const pack = await db.questionPacks.get(id);
   if (!pack) return false;
-  if (pack.isBuiltIn) {
-    // If user deletes a built-in pack, mark it or allow resetting, but prevent total loss
-    return false;
-  }
   await db.questionPacks.delete(id);
   return true;
 }
