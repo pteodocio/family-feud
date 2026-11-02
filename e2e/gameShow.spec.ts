@@ -16,25 +16,25 @@ test.describe('Family Feud Game Show End-to-End Tests', () => {
     await page.goto('/#/packs');
 
     await expect(page.getByText('QUESTION PACK LIBRARY')).toBeVisible();
-    // 25 Filipino packs should be loaded
+    // Filipino packs should be loaded (including new packs)
     await expect(page.getByText('Mga Linyahan ni Mama').first()).toBeVisible();
-    await expect(page.getByText('Videoke Champions').first()).toBeVisible();
-    await expect(page.getByText('Certified Pinoy Moments').first()).toBeVisible();
+    await expect(page.getByText('Sino Nagubos Nito?').first()).toBeVisible();
+    await expect(page.getByText('Picture Muna Bago Kain').first()).toBeVisible();
 
     // Test search filter
     const searchInput = page.getByPlaceholder('Search questions, prompts, or answers...');
-    await searchInput.fill('Jeepney');
-    await expect(page.getByText('Jeepney and Commute Problems').first()).toBeVisible();
+    await searchInput.fill('Loading');
+    await expect(page.getByText('Teka Lang, Naglo-loading').first()).toBeVisible();
   });
 
   test('Displays Filipino Question Packs in Game Setup and launches game directly', async ({ page }) => {
     await page.goto('/#/setup');
 
     await expect(page.getByText('GAME SETUP')).toBeVisible();
-    await expect(page.getByText('Mga Linyahan ni Mama').first()).toBeVisible();
+    await expect(page.getByText('Sino Nagubos Nito?').first()).toBeVisible();
 
     // Select the pack
-    await page.getByText('Mga Linyahan ni Mama').first().click();
+    await page.getByText('Sino Nagubos Nito?').first().click();
 
     // START GAME NOW should be enabled
     const startBtn = page.getByRole('button', { name: 'START GAME NOW' });

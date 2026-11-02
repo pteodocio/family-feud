@@ -1,6 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import type { GameSession, QuestionPack, GameConfig } from '../types/game';
-import { FILIPINO_25_PACKS } from '../data/filipinoPacks';
+import { FILIPINO_BUILTIN_PACKS } from '../data/filipinoPacks';
 
 export interface AppSettings {
   id: string; // 'global_settings'
@@ -58,7 +58,7 @@ export class FeudDatabase extends Dexie {
 export const db = new FeudDatabase();
 
 /**
- * Initializes database and ensures default settings and built-in 25 Filipino packs exist.
+ * Initializes database and ensures default settings and built-in Filipino packs exist.
  */
 export async function initializeDatabase(): Promise<void> {
   try {
@@ -67,8 +67,8 @@ export async function initializeDatabase(): Promise<void> {
       await db.settings.put(DEFAULT_SETTINGS);
     }
 
-    // Seed built-in 25 Filipino question packs if not yet present in IndexedDB
-    for (const pack of FILIPINO_25_PACKS) {
+    // Seed built-in Filipino question packs if not yet present in IndexedDB
+    for (const pack of FILIPINO_BUILTIN_PACKS) {
       const existing = await db.questionPacks.get(pack.id);
       if (!existing) {
         await db.questionPacks.put(pack);
@@ -133,12 +133,12 @@ export async function listQuestionPacks(): Promise<QuestionPack[]> {
   try {
     const packs = await db.questionPacks.toArray();
     if (packs.length === 0) {
-      return [...FILIPINO_25_PACKS].sort((a, b) => a.title.localeCompare(b.title));
+      return [...FILIPINO_BUILTIN_PACKS].sort((a, b) => a.title.localeCompare(b.title));
     }
     return packs.sort((a, b) => a.title.localeCompare(b.title));
   } catch (err) {
     console.error('Failed to list question packs:', err);
-    return [...FILIPINO_25_PACKS].sort((a, b) => a.title.localeCompare(b.title));
+    return [...FILIPINO_BUILTIN_PACKS].sort((a, b) => a.title.localeCompare(b.title));
   }
 }
 
@@ -156,7 +156,7 @@ export async function saveQuestionPack(pack: QuestionPack): Promise<void> {
 export async function loadQuestionPack(id: string): Promise<QuestionPack | undefined> {
   const pack = await db.questionPacks.get(id);
   if (pack) return pack;
-  return FILIPINO_25_PACKS.find((p) => p.id === id);
+  return FILIPINO_BUILTIN_PACKS.find((p) => p.id === id);
 }
 
 /**

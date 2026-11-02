@@ -4,14 +4,21 @@ import { PACKS_6_TO_10 } from './pack6to10';
 import { PACKS_11_TO_15 } from './pack11to15';
 import { PACKS_16_TO_20 } from './pack16to20';
 import { PACKS_21_TO_25 } from './pack21to25';
+import { PACKS_26_TO_31 } from './pack26to31';
 
-export const FILIPINO_25_PACKS: QuestionPack[] = [
+export const FILIPINO_NEW_6_PACKS: QuestionPack[] = PACKS_26_TO_31;
+
+export const FILIPINO_BUILTIN_PACKS: QuestionPack[] = [
   ...PACKS_1_TO_5,
   ...PACKS_6_TO_10,
   ...PACKS_11_TO_15,
   ...PACKS_16_TO_20,
   ...PACKS_21_TO_25,
+  ...PACKS_26_TO_31,
 ];
+
+// Alias for backwards compatibility
+export const FILIPINO_25_PACKS: QuestionPack[] = FILIPINO_BUILTIN_PACKS;
 
 export function validateQuestionPackIntegrity(packs: QuestionPack[]): {
   isValid: boolean;
