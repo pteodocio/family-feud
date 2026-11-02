@@ -161,7 +161,8 @@ export interface GameSession {
 // Broadcast Message Types for Multi-window Sync
 export type SyncMessage =
   | { type: 'STATE_UPDATE'; state: GameSession }
-  | { type: 'TRIGGER_SOUND'; sound: SoundEffectName }
+  | { type: 'TRIGGER_SOUND'; sound: SoundEffectName; id?: string; timestamp?: number }
+  | { type: 'TRIGGER_BGM'; track: BgmTrackName; action: 'play' | 'stop' | 'pause' }
   | { type: 'REQUEST_SYNC' }
   | { type: 'HEARTBEAT_PING'; timestamp: number }
   | { type: 'HEARTBEAT_PONG'; timestamp: number }
@@ -171,14 +172,26 @@ export type SyncMessage =
 
 export type SoundEffectName =
   | 'intro'
+  | 'round_start'
+  | 'round_win'
+  | 'round_transition'
   | 'reveal'
   | 'correct'
+  | 'wrong'
   | 'strike'
   | 'strike3'
+  | 'score_update'
   | 'countdown'
-  | 'round_win'
+  | 'timer_end'
   | 'steal_success'
   | 'steal_fail'
   | 'fast_money_bell'
   | 'fast_money_buzz'
-  | 'game_win';
+  | 'game_win'
+  | 'game_over'
+  | 'ui_click'
+  | 'ui_hover'
+  | 'ui_select'
+  | 'ui_start';
+
+export type BgmTrackName = 'none' | 'gameplay' | 'final' | 'intro';

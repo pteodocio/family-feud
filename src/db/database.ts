@@ -8,6 +8,9 @@ export interface AppSettings {
   masterVolume: number; // 0.0 - 1.0
   effectsVolume: number;
   bgmVolume: number;
+  bgmEnabled: boolean;
+  effectsEnabled: boolean;
+  audioDestination: 'auto' | 'tv_only' | 'host_only' | 'both';
   autoRevealOnAllDone: boolean;
   strikeSoundKey: string;
   keyboardShortcutsEnabled: boolean;
@@ -22,6 +25,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   masterVolume: 0.8,
   effectsVolume: 0.9,
   bgmVolume: 0.5,
+  bgmEnabled: true,
+  effectsEnabled: true,
+  audioDestination: 'auto',
   autoRevealOnAllDone: true,
   strikeSoundKey: 'buzzer',
   keyboardShortcutsEnabled: true,

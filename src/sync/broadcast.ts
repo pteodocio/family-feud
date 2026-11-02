@@ -1,11 +1,12 @@
-import type { GameSession, SyncMessage, SoundEffectName } from '../types/game';
+import type { GameSession, SyncMessage, SoundEffectName, BgmTrackName } from '../types/game';
 
 const CHANNEL_NAME = 'family-feud-sync-v1';
 
 class SyncBus {
   private channel: BroadcastChannel | null = null;
   private onStateUpdateCallbacks: Set<(session: GameSession) => void> = new Set();
-  private onSoundCallbacks: Set<(sound: SoundEffectName) => void> = new Set();
+  private onSoundCallbacks: Set<(sound: SoundEffectName, id?: string, timestamp?: number) => void> = new Set();
+  private onBgmCallbacks: Set<(bgm: { track: BgmTrackName; action: 'play' | 'stop' | 'pause' }) => void> = new Set();
   private onRequestSyncCallbacks: Set<() => void> = new Set();
   private onPingCallbacks: Set<(timestamp: number) => void> = new Set();
   private onPongCallbacks: Set<(timestamp: number) => void> = new Set();
@@ -34,7 +35,16 @@ class SyncBus {
         this.onStateUpdateCallbacks.forEach((cb) => cb(msg.state));
         break;
       case 'TRIGGER_SOUND':
-        this.onSoundCallbacks.forEach((cb) => cb(msg.sound));
+        this.onSoundCallbacks.forEach((cb) => {
+          if (msg.id !== undefined && msg.timestamp !== undefined) {
+            cb(msg.sound, msg.id, msg.timestamp);
+          } else {
+            cb(msg.sound);
+          }
+        });
+        break;
+      case 'TRIGGER_BGM':
+        this.onBgmCallbacks.forEach((cb) => cb({ track: msg.track, action: msg.action }));
         break;
       case 'REQUEST_SYNC':
         this.onRequestSyncCallbacks.forEach((cb) => cb());
@@ -70,9 +80,20 @@ class SyncBus {
   public broadcastSound(sound: SoundEffectName) {
     if (this.channel) {
       try {
-        this.channel.postMessage({ type: 'TRIGGER_SOUND', sound } as SyncMessage);
+        const id = `snd_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        this.channel.postMessage({ type: 'TRIGGER_SOUND', sound, id, timestamp: Date.now() } as SyncMessage);
       } catch (err) {
         console.warn('Failed to broadcast sound:', err);
+      }
+    }
+  }
+
+  public broadcastBgm(track: BgmTrackName, action: 'play' | 'stop' | 'pause' = 'play') {
+    if (this.channel) {
+      try {
+        this.channel.postMessage({ type: 'TRIGGER_BGM', track, action } as SyncMessage);
+      } catch (err) {
+        console.warn('Failed to broadcast BGM:', err);
       }
     }
   }
@@ -142,9 +163,14 @@ class SyncBus {
     return () => this.onStateUpdateCallbacks.delete(callback);
   }
 
-  public subscribeSound(callback: (sound: SoundEffectName) => void): () => void {
+  public subscribeSound(callback: (sound: SoundEffectName, id?: string, timestamp?: number) => void): () => void {
     this.onSoundCallbacks.add(callback);
     return () => this.onSoundCallbacks.delete(callback);
+  }
+
+  public subscribeBgm(callback: (bgm: { track: BgmTrackName; action: 'play' | 'stop' | 'pause' }) => void): () => void {
+    this.onBgmCallbacks.add(callback);
+    return () => this.onBgmCallbacks.delete(callback);
   }
 
   public subscribeRequestSync(callback: () => void): () => void {

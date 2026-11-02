@@ -1,361 +1,432 @@
-import type { SoundEffectName } from '../types/game';
+import type { SoundEffectName, BgmTrackName } from '../types/game';
 
-class SoundManager {
+interface SoundConfig {
+  file: string;
+  defaultGain?: number;
+}
+
+const SOUND_FILE_MAP: Record<SoundEffectName, SoundConfig> = {
+  strike: { file: '/audio/strike.wav', defaultGain: 1.0 },
+  strike3: { file: '/audio/strike3.wav', defaultGain: 1.0 },
+  correct: { file: '/audio/correct.wav', defaultGain: 0.9 },
+  reveal: { file: '/audio/reveal.wav', defaultGain: 0.85 },
+  wrong: { file: '/audio/wrong.wav', defaultGain: 0.85 },
+  score_update: { file: '/audio/score_update.wav', defaultGain: 0.75 },
+  countdown: { file: '/audio/countdown.wav', defaultGain: 0.65 },
+  timer_end: { file: '/audio/timer_end.wav', defaultGain: 1.0 },
+  round_win: { file: '/audio/round_win.wav', defaultGain: 0.9 },
+  round_start: { file: '/audio/round_start.wav', defaultGain: 0.85 },
+  round_transition: { file: '/audio/round_transition.wav', defaultGain: 0.85 },
+  steal_success: { file: '/audio/steal_success.wav', defaultGain: 0.9 },
+  steal_fail: { file: '/audio/steal_fail.wav', defaultGain: 0.85 },
+  fast_money_bell: { file: '/audio/fast_money_bell.wav', defaultGain: 0.9 },
+  fast_money_buzz: { file: '/audio/fast_money_buzz.wav', defaultGain: 0.85 },
+  intro: { file: '/audio/intro.wav', defaultGain: 0.95 },
+  game_win: { file: '/audio/game_win.wav', defaultGain: 1.0 },
+  game_over: { file: '/audio/game_over.wav', defaultGain: 0.9 },
+  ui_click: { file: '/audio/ui_click.wav', defaultGain: 0.4 },
+  ui_hover: { file: '/audio/ui_hover.wav', defaultGain: 0.25 },
+  ui_select: { file: '/audio/ui_select.wav', defaultGain: 0.5 },
+  ui_start: { file: '/audio/ui_start.wav', defaultGain: 0.8 },
+};
+
+const BGM_FILE_MAP: Record<Exclude<BgmTrackName, 'none'>, string> = {
+  gameplay: '/audio/bgm_gameplay.wav',
+  final: '/audio/bgm_final.wav',
+  intro: '/audio/intro.wav',
+};
+
+export class SoundManager {
   private ctx: AudioContext | null = null;
   private isMuted: boolean = false;
-  private volume: number = 0.8;
+  private masterVolume: number = 0.8;
+  private effectsVolume: number = 0.9;
+  private bgmVolume: number = 0.5;
+  private effectsEnabled: boolean = true;
+  private bgmEnabled: boolean = true;
   private initialized: boolean = false;
+
+  // Audio nodes
+  private masterGain: GainNode | null = null;
+  private effectsGain: GainNode | null = null;
+  private bgmGain: GainNode | null = null;
+
+  // Cached audio buffers
+  private bufferCache: Map<string, AudioBuffer> = new Map();
+  private loadingPromises: Map<string, Promise<AudioBuffer | null>> = new Map();
+
+  // Active BGM state
+  private activeBgmSource: AudioBufferSourceNode | null = null;
+  private currentBgmTrack: BgmTrackName = 'none';
+
+  // Debounce tracking
+  private lastTriggerTimes: Map<string, number> = new Map();
 
   public init() {
     if (this.initialized && this.ctx && this.ctx.state === 'running') return;
+
     try {
-      const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (AudioCtxClass) {
-        if (!this.ctx) {
-          this.ctx = new AudioCtxClass();
-        }
-        if (this.ctx.state === 'suspended') {
-          this.ctx.resume();
-        }
-        this.initialized = true;
+      if (typeof window === 'undefined') return;
+
+      const AudioCtxClass =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+
+      if (!AudioCtxClass) return;
+
+      if (!this.ctx) {
+        this.ctx = new AudioCtxClass();
+        this.setupAudioGraph();
       }
+
+      if (this.ctx.state === 'suspended') {
+        this.ctx.resume().catch(() => {});
+      }
+
+      this.initialized = true;
+
+      // Preload primary sound effects in the background
+      this.preloadCoreSounds();
     } catch (err) {
       console.warn('AudioContext failed to initialize:', err);
     }
   }
 
+  private setupAudioGraph() {
+    if (!this.ctx) return;
+
+    this.masterGain = this.ctx.createGain();
+    this.effectsGain = this.ctx.createGain();
+    this.bgmGain = this.ctx.createGain();
+
+    this.effectsGain.connect(this.masterGain);
+    this.bgmGain.connect(this.masterGain);
+    this.masterGain.connect(this.ctx.destination);
+
+    this.updateGainLevels();
+  }
+
+  private updateGainLevels() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+
+    const effectiveMaster = this.isMuted ? 0 : this.masterVolume;
+    const effectiveEffects = this.effectsEnabled ? this.effectsVolume : 0;
+    const effectiveBgm = this.bgmEnabled ? this.bgmVolume : 0;
+
+    if (this.masterGain) {
+      this.masterGain.gain.setValueAtTime(effectiveMaster, now);
+    }
+    if (this.effectsGain) {
+      this.effectsGain.gain.setValueAtTime(effectiveEffects, now);
+    }
+    if (this.bgmGain) {
+      this.bgmGain.gain.setValueAtTime(effectiveBgm, now);
+    }
+  }
+
+  // Preloads the most frequent game show sounds
+  private preloadCoreSounds() {
+    const coreList: SoundEffectName[] = [
+      'strike',
+      'strike3',
+      'correct',
+      'reveal',
+      'wrong',
+      'score_update',
+      'countdown',
+      'round_win',
+      'ui_click',
+    ];
+
+    coreList.forEach((effect) => {
+      const cfg = SOUND_FILE_MAP[effect];
+      if (cfg) {
+        this.loadAudioBuffer(cfg.file);
+      }
+    });
+  }
+
+  private async loadAudioBuffer(url: string): Promise<AudioBuffer | null> {
+    if (this.bufferCache.has(url)) {
+      return this.bufferCache.get(url)!;
+    }
+
+    if (this.loadingPromises.has(url)) {
+      return this.loadingPromises.get(url)!;
+    }
+
+    const loadPromise = (async () => {
+      try {
+        if (!this.ctx) this.init();
+        if (!this.ctx) return null;
+
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status} fetching ${url}`);
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        const decoded = await this.ctx.decodeAudioData(arrayBuffer);
+        this.bufferCache.set(url, decoded);
+        return decoded;
+      } catch (err) {
+        console.warn(`Could not load audio file ${url}, falling back to synthetic generator:`, err);
+        return null;
+      } finally {
+        this.loadingPromises.delete(url);
+      }
+    })();
+
+    this.loadingPromises.set(url, loadPromise);
+    return loadPromise;
+  }
+
+  // Volume & Preferences Controls
   public setMuted(muted: boolean) {
     this.isMuted = muted;
+    this.updateGainLevels();
   }
 
   public getMuted(): boolean {
     return this.isMuted;
   }
 
+  public setMasterVolume(vol: number) {
+    this.masterVolume = Math.max(0, Math.min(1, vol));
+    this.updateGainLevels();
+  }
+
+  public getMasterVolume(): number {
+    return this.masterVolume;
+  }
+
+  // Alias for backward compatibility
   public setVolume(vol: number) {
-    this.volume = Math.max(0, Math.min(1, vol));
+    this.setMasterVolume(vol);
   }
 
   public getVolume(): number {
-    return this.volume;
+    return this.getMasterVolume();
   }
 
-  public play(effect: SoundEffectName) {
-    if (this.isMuted || this.volume <= 0) return;
+  public setEffectsVolume(vol: number) {
+    this.effectsVolume = Math.max(0, Math.min(1, vol));
+    this.updateGainLevels();
+  }
+
+  public getEffectsVolume(): number {
+    return this.effectsVolume;
+  }
+
+  public setBgmVolume(vol: number) {
+    this.bgmVolume = Math.max(0, Math.min(1, vol));
+    this.updateGainLevels();
+  }
+
+  public getBgmVolume(): number {
+    return this.bgmVolume;
+  }
+
+  public setEffectsEnabled(enabled: boolean) {
+    this.effectsEnabled = enabled;
+    this.updateGainLevels();
+  }
+
+  public getEffectsEnabled(): boolean {
+    return this.effectsEnabled;
+  }
+
+  public setBgmEnabled(enabled: boolean) {
+    this.bgmEnabled = enabled;
+    this.updateGainLevels();
+    if (!enabled && this.activeBgmSource) {
+      this.stopBgm();
+    }
+  }
+
+  public getBgmEnabled(): boolean {
+    return this.bgmEnabled;
+  }
+
+  // Play a sound effect
+  public async play(effect: SoundEffectName) {
+    if (this.isMuted || !this.effectsEnabled || this.masterVolume <= 0 || this.effectsVolume <= 0) {
+      return;
+    }
+
+    // Debounce rapid identical sound triggers within 60ms
+    const now = Date.now();
+    const lastTime = this.lastTriggerTimes.get(effect) || 0;
+    if (now - lastTime < 60) {
+      return;
+    }
+    this.lastTriggerTimes.set(effect, now);
+
     this.init();
-    if (!this.ctx) return;
+    if (!this.ctx || !this.effectsGain) return;
+
+    const cfg = SOUND_FILE_MAP[effect];
+    if (!cfg) return;
+
+    // Try playing pre-rendered WAV asset
+    try {
+      const buffer = await this.loadAudioBuffer(cfg.file);
+      if (buffer && this.ctx && this.effectsGain) {
+        const source = this.ctx.createBufferSource();
+        const individualGain = this.ctx.createGain();
+
+        individualGain.gain.value = cfg.defaultGain ?? 1.0;
+        source.buffer = buffer;
+        source.connect(individualGain);
+        individualGain.connect(this.effectsGain);
+
+        source.start();
+        return;
+      }
+    } catch {
+      // Fallback to procedural synthesis below
+    }
+
+    // Procedural synthesis fallback
+    this.playSyntheticFallback(effect);
+  }
+
+  // Background Music (BGM) Controls
+  public async playBgm(track: BgmTrackName) {
+    if (track === 'none') {
+      this.stopBgm();
+      return;
+    }
+
+    if (this.currentBgmTrack === track && this.activeBgmSource) {
+      return;
+    }
+
+    if (this.isMuted || !this.bgmEnabled || this.masterVolume <= 0 || this.bgmVolume <= 0) {
+      this.currentBgmTrack = track;
+      return;
+    }
+
+    this.init();
+    if (!this.ctx || !this.bgmGain) return;
+
+    const fileUrl = BGM_FILE_MAP[track];
+    if (!fileUrl) return;
 
     try {
-      switch (effect) {
-        case 'reveal':
-          this.playRevealSound();
-          break;
-        case 'correct':
-          this.playCorrectChime();
-          break;
-        case 'strike':
-          this.playStrikeBuzzer(false);
-          break;
-        case 'strike3':
-          this.playStrikeBuzzer(true);
-          break;
-        case 'countdown':
-          this.playTick();
-          break;
-        case 'round_win':
-          this.playRoundWin();
-          break;
-        case 'steal_success':
-          this.playStealSuccess();
-          break;
-        case 'steal_fail':
-          this.playStealFail();
-          break;
-        case 'fast_money_bell':
-          this.playBell();
-          break;
-        case 'fast_money_buzz':
-          this.playZeroBuzz();
-          break;
-        case 'intro':
-          this.playIntroFanfare();
-          break;
-        case 'game_win':
-          this.playVictoryFanfare();
-          break;
-      }
-    } catch (e) {
-      console.warn(`Failed to play sound "${effect}":`, e);
+      const buffer = await this.loadAudioBuffer(fileUrl);
+      if (!buffer || !this.ctx || !this.bgmGain) return;
+
+      // Smoothly stop existing BGM
+      this.stopBgm(0.3);
+
+      const source = this.ctx.createBufferSource();
+      source.buffer = buffer;
+      source.loop = true;
+      source.connect(this.bgmGain);
+
+      // Fade in
+      const now = this.ctx.currentTime;
+      this.bgmGain.gain.setValueAtTime(0, now);
+      this.bgmGain.gain.linearRampToValueAtTime(this.bgmVolume, now + 0.5);
+
+      source.start();
+      this.activeBgmSource = source;
+      this.currentBgmTrack = track;
+    } catch (err) {
+      console.warn(`Failed to play BGM track ${track}:`, err);
     }
   }
 
-  // Answer card flip / reveal click
-  private playRevealSound() {
-    if (!this.ctx) return;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
+  public stopBgm(fadeTime = 0.4) {
+    if (!this.activeBgmSource) {
+      this.currentBgmTrack = 'none';
+      return;
+    }
 
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(400, this.ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.12);
+    try {
+      if (this.ctx && this.bgmGain && fadeTime > 0) {
+        const now = this.ctx.currentTime;
+        this.bgmGain.gain.setValueAtTime(this.bgmGain.gain.value, now);
+        this.bgmGain.gain.linearRampToValueAtTime(0, now + fadeTime);
 
-    gain.gain.setValueAtTime(0.3 * this.volume, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+        const oldSource = this.activeBgmSource;
+        setTimeout(() => {
+          try {
+            oldSource.stop();
+            oldSource.disconnect();
+          } catch {}
+        }, fadeTime * 1000);
+      } else {
+        this.activeBgmSource.stop();
+        this.activeBgmSource.disconnect();
+      }
+    } catch {}
 
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-
-    osc.start();
-    osc.stop(this.ctx.currentTime + 0.15);
+    this.activeBgmSource = null;
+    this.currentBgmTrack = 'none';
   }
 
-  // Correct answer bell/ding
-  private playCorrectChime() {
-    if (!this.ctx) return;
-    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
-    notes.forEach((freq, idx) => {
-      const osc = this.ctx!.createOscillator();
-      const gain = this.ctx!.createGain();
-
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, this.ctx!.currentTime + idx * 0.05);
-
-      gain.gain.setValueAtTime(0, this.ctx!.currentTime + idx * 0.05);
-      gain.gain.linearRampToValueAtTime(0.4 * this.volume, this.ctx!.currentTime + idx * 0.05 + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx!.currentTime + idx * 0.05 + 0.6);
-
-      osc.connect(gain);
-      gain.connect(this.ctx!.destination);
-
-      osc.start(this.ctx!.currentTime + idx * 0.05);
-      osc.stop(this.ctx!.currentTime + idx * 0.05 + 0.6);
-    });
+  public getCurrentBgm(): BgmTrackName {
+    return this.currentBgmTrack;
   }
 
-  // Strike buzzer sound
-  private playStrikeBuzzer(isTriple: boolean) {
-    if (!this.ctx) return;
-    const count = isTriple ? 2 : 1;
+  // -------------------------------------------------------------
+  // PROCEDURAL SYNTHESIS FALLBACK (Safety net for tests & offline)
+  // -------------------------------------------------------------
+  private playSyntheticFallback(effect: SoundEffectName) {
+    if (!this.ctx || !this.effectsGain) return;
 
-    for (let i = 0; i < count; i++) {
-      const startTime = this.ctx.currentTime + i * 0.35;
-      const osc1 = this.ctx.createOscillator();
-      const osc2 = this.ctx.createOscillator();
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
 
-      osc1.type = 'sawtooth';
-      osc1.frequency.setValueAtTime(125, startTime);
+      switch (effect) {
+        case 'strike':
+        case 'strike3':
+        case 'wrong':
+        case 'timer_end':
+        case 'fast_money_buzz':
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(130, now);
+          gain.gain.setValueAtTime(0.5, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + (effect === 'strike3' ? 0.8 : 0.4));
+          osc.connect(gain);
+          gain.connect(this.effectsGain);
+          osc.start(now);
+          osc.stop(now + (effect === 'strike3' ? 0.8 : 0.4));
+          break;
 
-      osc2.type = 'sawtooth';
-      osc2.frequency.setValueAtTime(132, startTime); // dissonant low beat
+        case 'reveal':
+        case 'correct':
+        case 'fast_money_bell':
+        case 'ui_click':
+        case 'ui_hover':
+        case 'ui_select':
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(880, now);
+          osc.frequency.exponentialRampToValueAtTime(1760, now + 0.15);
+          gain.gain.setValueAtTime(0.4, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+          osc.connect(gain);
+          gain.connect(this.effectsGain);
+          osc.start(now);
+          osc.stop(now + 0.3);
+          break;
 
-      gain.gain.setValueAtTime(0.6 * this.volume, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.3);
-
-      osc1.connect(gain);
-      osc2.connect(gain);
-      gain.connect(this.ctx.destination);
-
-      osc1.start(startTime);
-      osc1.stop(startTime + 0.3);
-      osc2.start(startTime);
-      osc2.stop(startTime + 0.3);
-    }
-  }
-
-  // Timer tick
-  private playTick() {
-    if (!this.ctx) return;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(880, this.ctx.currentTime);
-
-    gain.gain.setValueAtTime(0.15 * this.volume, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
-
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-
-    osc.start();
-    osc.stop(this.ctx.currentTime + 0.04);
-  }
-
-  // Single bell (Fast Money survey points reveal)
-  private playBell() {
-    if (!this.ctx) return;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, this.ctx.currentTime); // A5
-
-    gain.gain.setValueAtTime(0.5 * this.volume, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.5);
-
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-
-    osc.start();
-    osc.stop(this.ctx.currentTime + 0.5);
-  }
-
-  // Zero points blip buzz
-  private playZeroBuzz() {
-    if (!this.ctx) return;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(110, this.ctx.currentTime);
-
-    gain.gain.setValueAtTime(0.4 * this.volume, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
-
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-
-    osc.start();
-    osc.stop(this.ctx.currentTime + 0.25);
-  }
-
-  // Steal success fanfare
-  private playStealSuccess() {
-    if (!this.ctx) return;
-    const chords = [
-      [523.25, 659.25], // C5, E5
-      [587.33, 698.46], // D5, F5
-      [659.25, 783.99], // E5, G5
-      [783.99, 1046.5], // G5, C6
-    ];
-
-    chords.forEach((chord, i) => {
-      const time = this.ctx!.currentTime + i * 0.12;
-      chord.forEach((freq) => {
-        const osc = this.ctx!.createOscillator();
-        const gain = this.ctx!.createGain();
-
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, time);
-
-        gain.gain.setValueAtTime(0.35 * this.volume, time);
-        gain.gain.exponentialRampToValueAtTime(0.01, time + 0.3);
-
-        osc.connect(gain);
-        gain.connect(this.ctx!.destination);
-
-        osc.start(time);
-        osc.stop(time + 0.3);
-      });
-    });
-  }
-
-  // Steal fail sad slide
-  private playStealFail() {
-    if (!this.ctx) return;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(280, this.ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(130, this.ctx.currentTime + 0.6);
-
-    gain.gain.setValueAtTime(0.4 * this.volume, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.6);
-
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-
-    osc.start();
-    osc.stop(this.ctx.currentTime + 0.6);
-  }
-
-  // Round Win fanfare
-  private playRoundWin() {
-    if (!this.ctx) return;
-    const notes = [440, 554.37, 659.25, 880]; // A4, C#5, E5, A5
-    notes.forEach((freq, idx) => {
-      const osc = this.ctx!.createOscillator();
-      const gain = this.ctx!.createGain();
-
-      const time = this.ctx!.currentTime + idx * 0.14;
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, time);
-
-      gain.gain.setValueAtTime(0.4 * this.volume, time);
-      gain.gain.exponentialRampToValueAtTime(0.01, time + 0.5);
-
-      osc.connect(gain);
-      gain.connect(this.ctx!.destination);
-
-      osc.start(time);
-      osc.stop(time + 0.5);
-    });
-  }
-
-  // Intro fanfare
-  private playIntroFanfare() {
-    if (!this.ctx) return;
-    const melody = [
-      { f: 392, d: 0.15 }, // G4
-      { f: 523.25, d: 0.15 }, // C5
-      { f: 659.25, d: 0.15 }, // E5
-      { f: 783.99, d: 0.35 }, // G5
-      { f: 659.25, d: 0.15 }, // E5
-      { f: 783.99, d: 0.5 }, // G5
-    ];
-
-    let curr = this.ctx.currentTime;
-    melody.forEach((note) => {
-      const osc = this.ctx!.createOscillator();
-      const gain = this.ctx!.createGain();
-
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(note.f, curr);
-
-      gain.gain.setValueAtTime(0.45 * this.volume, curr);
-      gain.gain.exponentialRampToValueAtTime(0.01, curr + note.d);
-
-      osc.connect(gain);
-      gain.connect(this.ctx!.destination);
-
-      osc.start(curr);
-      osc.stop(curr + note.d);
-
-      curr += note.d * 0.85;
-    });
-  }
-
-  // Game Victory Celebration
-  private playVictoryFanfare() {
-    if (!this.ctx) return;
-    const sequence = [
-      { f: 523.25, t: 0.0, d: 0.2 },
-      { f: 659.25, t: 0.2, d: 0.2 },
-      { f: 783.99, t: 0.4, d: 0.2 },
-      { f: 1046.5, t: 0.6, d: 0.6 },
-      { f: 880.0, t: 1.2, d: 0.25 },
-      { f: 1046.5, t: 1.45, d: 0.8 },
-    ];
-
-    sequence.forEach(({ f, t, d }) => {
-      const osc = this.ctx!.createOscillator();
-      const gain = this.ctx!.createGain();
-
-      const startTime = this.ctx!.currentTime + t;
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(f, startTime);
-
-      gain.gain.setValueAtTime(0.5 * this.volume, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, startTime + d);
-
-      osc.connect(gain);
-      gain.connect(this.ctx!.destination);
-
-      osc.start(startTime);
-      osc.stop(startTime + d);
-    });
+        default:
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(523.25, now);
+          gain.gain.setValueAtTime(0.4, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+          osc.connect(gain);
+          gain.connect(this.effectsGain);
+          osc.start(now);
+          osc.stop(now + 0.5);
+          break;
+      }
+    } catch {}
   }
 }
 

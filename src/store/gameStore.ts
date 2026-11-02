@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { GamePhase } from '../types/game';
-import type { GameSession, SoundEffectName } from '../types/game';
+import type { GameSession, SoundEffectName, BgmTrackName } from '../types/game';
 import { DEFAULT_SETTINGS, saveGameSession, loadGameSession, loadSettings, saveSettings } from '../db/database';
 import type { AppSettings } from '../db/database';
 import {
@@ -82,8 +82,12 @@ interface GameStoreState {
   resetFastMoneyTimer: (seconds: number) => void;
   tickFastMoneyTimer: () => void;
 
-  // Audio trigger
+  // Audio & Multi-screen State
+  tvConnected: boolean;
+  setTvConnected: (connected: boolean) => void;
   playSound: (sound: SoundEffectName) => void;
+  playBgm: (track: BgmTrackName) => void;
+  stopBgm: () => void;
 }
 
 const MAX_UNDO_STACK = 25;
@@ -95,6 +99,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   strikeOverlay: { show: false, count: 0 },
   fastMoneyTimer: { running: false, remaining: 20 },
   isLoading: false,
+  tvConnected: false,
+
+  setTvConnected: (connected: boolean) => set({ tvConnected: connected }),
 
   setSession: (session) => {
     set({ session });
@@ -121,16 +128,24 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   loadGlobalSettings: async () => {
     const s = await loadSettings();
-    soundManager.setVolume(s.masterVolume * s.effectsVolume);
+    soundManager.setMasterVolume(s.masterVolume);
+    soundManager.setEffectsVolume(s.effectsVolume);
+    soundManager.setBgmVolume(s.bgmVolume);
     soundManager.setMuted(!s.soundEnabled);
+    soundManager.setEffectsEnabled(s.effectsEnabled ?? true);
+    soundManager.setBgmEnabled(s.bgmEnabled ?? true);
     set({ settings: s });
   },
 
   updateSettings: async (newSettings) => {
     const current = get().settings;
     const merged = { ...current, ...newSettings };
-    soundManager.setVolume(merged.masterVolume * merged.effectsVolume);
+    soundManager.setMasterVolume(merged.masterVolume);
+    soundManager.setEffectsVolume(merged.effectsVolume);
+    soundManager.setBgmVolume(merged.bgmVolume);
     soundManager.setMuted(!merged.soundEnabled);
+    soundManager.setEffectsEnabled(merged.effectsEnabled ?? true);
+    soundManager.setBgmEnabled(merged.bgmEnabled ?? true);
     await saveSettings(merged);
     set({ settings: merged });
   },
@@ -269,6 +284,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     set({ session: newSession, undoStack: nextUndo });
     saveGameSession(newSession);
     syncBus.broadcastState(newSession);
+    get().stopBgm();
     get().playSound('round_win');
   },
 
@@ -285,8 +301,13 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     if (newSession.phase === GamePhase.FAST_MONEY) {
       get().playSound('intro');
+      get().playBgm('final');
+    } else if (newSession.phase === GamePhase.FINAL_RESULTS) {
+      get().stopBgm();
+      get().playSound('game_win');
     } else {
-      get().playSound('reveal');
+      get().playSound('round_start');
+      get().playBgm('gameplay');
     }
   },
 
@@ -338,6 +359,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     set({ session: newSession, undoStack: nextUndo });
     saveGameSession(newSession);
     syncBus.broadcastState(newSession);
+    get().stopBgm();
     get().playSound('game_win');
   },
 
@@ -351,7 +373,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     set({ session: newSession, undoStack: nextUndo });
     saveGameSession(newSession);
     syncBus.broadcastState(newSession);
-    get().playSound('reveal');
+    if (delta > 0) {
+      get().playSound('score_update');
+    } else {
+      get().playSound('reveal');
+    }
   },
 
   undo: () => {
@@ -463,7 +489,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     if (fastMoneyTimer.remaining <= 1) {
       set({ fastMoneyTimer: { running: false, remaining: 0 } });
       syncBus.broadcastTimer(0, false);
-      get().playSound('strike3');
+      get().playSound('timer_end');
     } else {
       const next = fastMoneyTimer.remaining - 1;
       set({ fastMoneyTimer: { running: true, remaining: next } });
@@ -475,7 +501,44 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   },
 
   playSound: (sound: SoundEffectName) => {
-    soundManager.play(sound);
+    const { settings, tvConnected } = get();
+    const destination = settings.audioDestination || 'auto';
+
+    // Broadcast to sync bus so TV Display receives the sound event
     syncBus.broadcastSound(sound);
+
+    // Audio destination routing for host device:
+    // If 'tv_only': host remains silent (played exclusively on TV)
+    // If 'auto': if TV is connected, host remains silent to prevent duplicate audio echo; if TV is disconnected, host plays locally
+    // If 'host_only' or 'both': host plays locally
+    const shouldPlayOnHost =
+      destination === 'host_only' ||
+      destination === 'both' ||
+      (destination === 'auto' && !tvConnected);
+
+    if (shouldPlayOnHost) {
+      soundManager.play(sound);
+    }
+  },
+
+  playBgm: (track: BgmTrackName) => {
+    const { settings, tvConnected } = get();
+    const destination = settings.audioDestination || 'auto';
+
+    syncBus.broadcastBgm(track, 'play');
+
+    const shouldPlayOnHost =
+      destination === 'host_only' ||
+      destination === 'both' ||
+      (destination === 'auto' && !tvConnected);
+
+    if (shouldPlayOnHost) {
+      soundManager.playBgm(track);
+    }
+  },
+
+  stopBgm: () => {
+    syncBus.broadcastBgm('none', 'stop');
+    soundManager.stopBgm();
   },
 }));

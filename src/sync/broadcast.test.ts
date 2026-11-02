@@ -130,4 +130,19 @@ describe('BroadcastChannel Synchronization Tests', () => {
     unsub();
     remoteChannel.close();
   });
+
+  it('broadcasts and receives BGM track controls', async () => {
+    const bgmSpy = vi.fn();
+    const unsub = syncBus.subscribeBgm(bgmSpy);
+
+    const remoteChannel = new BroadcastChannel('family-feud-sync-v1');
+    remoteChannel.postMessage({ type: 'TRIGGER_BGM', track: 'gameplay', action: 'play' });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(bgmSpy).toHaveBeenCalledWith({ track: 'gameplay', action: 'play' });
+
+    unsub();
+    remoteChannel.close();
+  });
 });

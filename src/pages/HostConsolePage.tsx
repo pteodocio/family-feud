@@ -3,6 +3,7 @@ import {
   RotateCcw,
   Volume2,
   VolumeX,
+  Music,
   Tv,
   CheckCircle2,
   XCircle,
@@ -61,6 +62,9 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
     pauseFastMoneyTimer,
     resetFastMoneyTimer,
     tickFastMoneyTimer,
+    setTvConnected,
+    playBgm,
+    stopBgm,
   } = useGameStore();
 
   const { openDisplayWindow, closeDisplayWindow, isDisplayWindowOpen, navigate } = useRouter();
@@ -85,6 +89,7 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
       setLastPongTime((prevPong) => {
         if (prevPong > 0 && Date.now() - prevPong > 7000) {
           setTvStatus('disconnected');
+          setTvConnected(false);
         }
         return prevPong;
       });
@@ -94,11 +99,13 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
 
     const unsubPong = syncBus.subscribePong(() => {
       setTvStatus('connected');
+      setTvConnected(true);
       setLastPongTime(Date.now());
     });
 
     const unsubReqSync = syncBus.subscribeRequestSync(() => {
       setTvStatus('connected');
+      setTvConnected(true);
       setLastPongTime(Date.now());
       if (session) {
         syncBus.broadcastState(session);
@@ -297,6 +304,29 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
             title={settings.soundEnabled ? 'Mute Sounds' : 'Unmute Sounds'}
           >
             {settings.soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+          </button>
+
+          {/* BGM Music Toggle */}
+          <button
+            onClick={() => {
+              const next = settings.bgmEnabled === false;
+              updateSettings({ bgmEnabled: next });
+              if (!next) {
+                stopBgm();
+              } else if (session.phase === GamePhase.FAST_MONEY) {
+                playBgm('final');
+              } else if (session.phase === GamePhase.FACEOFF || session.phase === GamePhase.REGULAR) {
+                playBgm('gameplay');
+              }
+            }}
+            className={`p-1.5 rounded-lg border text-xs font-bold ${
+              settings.bgmEnabled !== false
+                ? 'bg-purple-900/60 border-purple-600 text-purple-300'
+                : 'bg-gray-800 border-gray-700 text-gray-500'
+            }`}
+            title={settings.bgmEnabled !== false ? 'Mute Background Music' : 'Unmute Background Music'}
+          >
+            <Music className="w-4 h-4" />
           </button>
         </div>
       </header>

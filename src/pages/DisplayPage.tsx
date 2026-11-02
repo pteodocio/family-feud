@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Maximize, Minimize } from 'lucide-react';
 import { GamePhase } from '../types/game';
 import type { GameSession } from '../types/game';
-import { loadGameSession } from '../db/database';
+import { loadGameSession, loadSettings } from '../db/database';
 import { syncBus } from '../sync/broadcast';
 import { soundManager } from '../audio/soundManager';
 import { ScoreHeader } from '../components/display/ScoreHeader';
@@ -30,6 +30,27 @@ export function DisplayPage({ gameId }: DisplayPageProps) {
   // Load session & set up Broadcast sync & Heartbeat
   useEffect(() => {
     let isMounted = true;
+    let audioDest: string = 'auto';
+
+    // Unlock Web Audio context on user interaction (resolves browser autoplay policy)
+    const unlockAudio = () => {
+      soundManager.init();
+      window.removeEventListener('pointerdown', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+    };
+    window.addEventListener('pointerdown', unlockAudio);
+    window.addEventListener('keydown', unlockAudio);
+
+    loadSettings().then((s) => {
+      if (!isMounted || !s) return;
+      audioDest = s.audioDestination || 'auto';
+      soundManager.setMasterVolume(s.masterVolume);
+      soundManager.setEffectsVolume(s.effectsVolume);
+      soundManager.setBgmVolume(s.bgmVolume);
+      soundManager.setEffectsEnabled(s.effectsEnabled ?? true);
+      soundManager.setBgmEnabled(s.bgmEnabled ?? true);
+      soundManager.setMuted(!s.soundEnabled);
+    });
 
     loadGameSession(gameId).then((loaded) => {
       if (isMounted && loaded) {
@@ -58,7 +79,17 @@ export function DisplayPage({ gameId }: DisplayPageProps) {
     });
 
     const unsubSound = syncBus.subscribeSound((sound) => {
+      if (audioDest === 'host_only') return;
       soundManager.play(sound);
+    });
+
+    const unsubBgm = syncBus.subscribeBgm(({ track, action }) => {
+      if (audioDest === 'host_only') return;
+      if (action === 'play') {
+        soundManager.playBgm(track);
+      } else {
+        soundManager.stopBgm();
+      }
     });
 
     const unsubPing = syncBus.subscribePing((timestamp) => {
@@ -87,8 +118,12 @@ export function DisplayPage({ gameId }: DisplayPageProps) {
 
     return () => {
       isMounted = false;
+      window.removeEventListener('pointerdown', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+      soundManager.stopBgm(0.1);
       unsubState();
       unsubSound();
+      unsubBgm();
       unsubPing();
       unsubFullscreen();
       unsubClose();
