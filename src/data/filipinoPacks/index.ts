@@ -1,0 +1,74 @@
+import type { QuestionPack } from '../../types/game';
+import { PACKS_1_TO_5 } from './pack1to5';
+import { PACKS_6_TO_10 } from './pack6to10';
+import { PACKS_11_TO_15 } from './pack11to15';
+import { PACKS_16_TO_20 } from './pack16to20';
+import { PACKS_21_TO_25 } from './pack21to25';
+
+export const FILIPINO_25_PACKS: QuestionPack[] = [
+  ...PACKS_1_TO_5,
+  ...PACKS_6_TO_10,
+  ...PACKS_11_TO_15,
+  ...PACKS_16_TO_20,
+  ...PACKS_21_TO_25,
+];
+
+export function validateQuestionPackIntegrity(packs: QuestionPack[]): {
+  isValid: boolean;
+  packCount: number;
+  questionCount: number;
+  answerCount: number;
+  errors: string[];
+} {
+  const errors: string[] = [];
+  let totalQuestions = 0;
+  let totalAnswers = 0;
+  const seenPackIds = new Set<string>();
+  const seenQuestionIds = new Set<string>();
+
+  for (const pack of packs) {
+    if (seenPackIds.has(pack.id)) {
+      errors.push(`Duplicate pack ID: ${pack.id}`);
+    }
+    seenPackIds.add(pack.id);
+
+    if (pack.questions.length !== 5) {
+      errors.push(`Pack ${pack.id} (${pack.title}) does not have exactly 5 questions (has ${pack.questions.length})`);
+    }
+
+    for (const q of pack.questions) {
+      totalQuestions++;
+      if (seenQuestionIds.has(q.id)) {
+        errors.push(`Duplicate question ID: ${q.id}`);
+      }
+      seenQuestionIds.add(q.id);
+
+      if (q.answers.length < 3 || q.answers.length > 5) {
+        errors.push(`Question ${q.id} has ${q.answers.length} answers, expected 3 to 5`);
+      }
+
+      const sumPoints = q.answers.reduce((acc, a) => acc + a.points, 0);
+      if (sumPoints !== 100) {
+        errors.push(`Question ${q.id} in pack ${pack.title} points sum to ${sumPoints}, expected 100`);
+      }
+
+      for (let i = 0; i < q.answers.length - 1; i++) {
+        if (q.answers[i].points < q.answers[i + 1].points) {
+          errors.push(
+            `Question ${q.id} answers not sorted descending: answer ${i} (${q.answers[i].points}) < answer ${i + 1} (${q.answers[i + 1].points})`
+          );
+        }
+      }
+
+      totalAnswers += q.answers.length;
+    }
+  }
+
+  return {
+    isValid: errors.length === 0,
+    packCount: packs.length,
+    questionCount: totalQuestions,
+    answerCount: totalAnswers,
+    errors,
+  };
+}

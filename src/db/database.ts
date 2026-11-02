@@ -1,5 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import type { GameSession, QuestionPack, GameConfig } from '../types/game';
+import { FILIPINO_25_PACKS } from '../data/filipinoPacks';
 
 export interface AppSettings {
   id: string; // 'global_settings'
@@ -57,24 +58,21 @@ export class FeudDatabase extends Dexie {
 export const db = new FeudDatabase();
 
 /**
- * Initializes database and ensures default settings exist.
- * Does not seed any default packs (all packs removed).
- * Automatically purges any previously stored packs once.
+ * Initializes database and ensures default settings and built-in 25 Filipino packs exist.
  */
 export async function initializeDatabase(): Promise<void> {
   try {
-    const purgeKey = 'feud_packs_purged_v3';
-    const isPurged = typeof window !== 'undefined' ? window.localStorage?.getItem(purgeKey) : null;
-    if (!isPurged) {
-      await db.questionPacks.clear();
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(purgeKey, 'true');
-      }
-    }
-
     const currentSettings = await db.settings.get('global_settings');
     if (!currentSettings) {
       await db.settings.put(DEFAULT_SETTINGS);
+    }
+
+    // Seed built-in 25 Filipino question packs if not yet present in IndexedDB
+    for (const pack of FILIPINO_25_PACKS) {
+      const existing = await db.questionPacks.get(pack.id);
+      if (!existing) {
+        await db.questionPacks.put(pack);
+      }
     }
   } catch (err) {
     console.error('Database initialization error:', err);
@@ -134,10 +132,13 @@ export async function deleteGameSession(id: string): Promise<void> {
 export async function listQuestionPacks(): Promise<QuestionPack[]> {
   try {
     const packs = await db.questionPacks.toArray();
+    if (packs.length === 0) {
+      return [...FILIPINO_25_PACKS].sort((a, b) => a.title.localeCompare(b.title));
+    }
     return packs.sort((a, b) => a.title.localeCompare(b.title));
   } catch (err) {
     console.error('Failed to list question packs:', err);
-    return [];
+    return [...FILIPINO_25_PACKS].sort((a, b) => a.title.localeCompare(b.title));
   }
 }
 
@@ -153,7 +154,9 @@ export async function saveQuestionPack(pack: QuestionPack): Promise<void> {
  * Loads a specific question pack.
  */
 export async function loadQuestionPack(id: string): Promise<QuestionPack | undefined> {
-  return await db.questionPacks.get(id);
+  const pack = await db.questionPacks.get(id);
+  if (pack) return pack;
+  return FILIPINO_25_PACKS.find((p) => p.id === id);
 }
 
 /**

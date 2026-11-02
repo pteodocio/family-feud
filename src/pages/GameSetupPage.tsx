@@ -11,6 +11,7 @@ export function GameSetupPage() {
   const { setSession } = useGameStore();
 
   const [packs, setPacks] = useState<QuestionPack[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedPackId, setSelectedPackId] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [team1Name, setTeam1Name] = useState('Santos Family');
@@ -25,12 +26,14 @@ export function GameSetupPage() {
   const [fastMoneyTimer2, setFastMoneyTimer2] = useState(25);
 
   useEffect(() => {
+    setIsLoading(true);
     initializeDatabase().then(async () => {
       const loadedPacks = await listQuestionPacks();
       setPacks(loadedPacks);
       if (loadedPacks.length > 0) {
         setSelectedPackId(loadedPacks[0].id);
       }
+      setIsLoading(false);
     });
 
     loadSettings().then((s) => {
@@ -254,7 +257,11 @@ export function GameSetupPage() {
                 </span>
               </div>
 
-              {packs.length === 0 ? (
+              {isLoading ? (
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-blue-200 text-xs">
+                  Loading question packs...
+                </div>
+              ) : packs.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center p-8 text-center border-2 border-dashed border-blue-800 rounded-xl my-4">
                   <div className="w-12 h-12 rounded-full bg-blue-950 border border-blue-700 flex items-center justify-center mb-3 text-feud-gold">
                     <FolderKanban className="w-6 h-6" />

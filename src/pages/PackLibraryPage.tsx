@@ -21,6 +21,7 @@ import type { QuestionPack } from '../types/game';
 export function PackLibraryPage() {
   const { navigate } = useRouter();
   const [packs, setPacks] = useState<QuestionPack[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -28,9 +29,11 @@ export function PackLibraryPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadPacks = async () => {
+    setIsLoading(true);
     await initializeDatabase();
     const loaded = await listQuestionPacks();
     setPacks(loaded);
+    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -324,7 +327,11 @@ export function PackLibraryPage() {
         </div>
 
         {/* PACK CARDS GRID / EMPTY STATE */}
-        {packs.length === 0 ? (
+        {isLoading ? (
+          <div className="bg-[#071638] border border-blue-900 rounded-3xl p-12 text-center text-blue-200 text-sm max-w-xl mx-auto shadow-lg my-6">
+            Loading question packs...
+          </div>
+        ) : packs.length === 0 ? (
           <div className="bg-[#071638] border-2 border-dashed border-blue-800 rounded-3xl p-8 sm:p-14 text-center max-w-xl mx-auto flex flex-col items-center justify-center shadow-lg my-6">
             <div className="w-16 h-16 rounded-full bg-blue-950 border border-blue-700 flex items-center justify-center mb-4 text-feud-gold">
               <FolderKanban className="w-8 h-8" />

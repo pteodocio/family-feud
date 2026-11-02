@@ -21,10 +21,11 @@ describe('Dexie Database Persistence Tests', () => {
     await db.settings.clear();
   });
 
-  it('initializes without seeding any question packs', async () => {
+  it('initializes and seeds the 25 Filipino question packs', async () => {
     await initializeDatabase();
     const packs = await listQuestionPacks();
-    expect(packs.length).toBe(0);
+    expect(packs.length).toBe(25);
+    expect(packs.some((p) => p.title === 'Mga Linyahan ni Mama')).toBe(true);
   });
 
   it('saves, loads, and deletes game sessions', async () => {

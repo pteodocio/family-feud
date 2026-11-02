@@ -12,43 +12,58 @@ test.describe('Family Feud Game Show End-to-End Tests', () => {
     await expect(page.getByText('GAME SETUP')).toBeVisible();
   });
 
-  test('Displays clean empty state in Question Pack Library when no packs exist', async ({ page }) => {
+  test('Displays Filipino Question Packs in Question Pack Library with search and categories', async ({ page }) => {
     await page.goto('/#/packs');
 
     await expect(page.getByText('QUESTION PACK LIBRARY')).toBeVisible();
-    await expect(page.getByText('No question packs available yet.')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Create New Pack' })).toBeVisible();
+    // 25 Filipino packs should be loaded
+    await expect(page.getByText('Mga Linyahan ni Mama').first()).toBeVisible();
+    await expect(page.getByText('Videoke Champions').first()).toBeVisible();
+    await expect(page.getByText('Certified Pinoy Moments').first()).toBeVisible();
+
+    // Test search filter
+    const searchInput = page.getByPlaceholder('Search questions, prompts, or answers...');
+    await searchInput.fill('Jeepney');
+    await expect(page.getByText('Jeepney and Commute Problems').first()).toBeVisible();
   });
 
-  test('Displays clean empty state in Game Setup when no packs exist and disables launch', async ({ page }) => {
+  test('Displays Filipino Question Packs in Game Setup and launches game directly', async ({ page }) => {
     await page.goto('/#/setup');
 
     await expect(page.getByText('GAME SETUP')).toBeVisible();
-    await expect(page.getByText('No question packs available yet.')).toBeVisible();
+    await expect(page.getByText('Mga Linyahan ni Mama').first()).toBeVisible();
 
+    // Select the pack
+    await page.getByText('Mga Linyahan ni Mama').first().click();
+
+    // START GAME NOW should be enabled
     const startBtn = page.getByRole('button', { name: 'START GAME NOW' });
-    await expect(startBtn).toBeDisabled();
+    await expect(startBtn).toBeEnabled();
+    await startBtn.click();
+
+    // Host Console loads
+    await expect(page.getByText('HOST CONSOLE')).toBeVisible();
   });
 
   test('Creates custom pack, configures questions, and launches game', async ({ page }) => {
     // 1. Go to Packs Library
     await page.goto('/#/packs');
-    await expect(page.getByText('No question packs available yet.')).toBeVisible();
+    await expect(page.getByText('QUESTION PACK LIBRARY')).toBeVisible();
 
-    // 2. Click Create New Pack
-    await page.getByRole('button', { name: 'Create New Pack' }).click();
+    // 2. Click Create Custom Pack
+    await page.getByRole('button', { name: /Create (Custom|New) Pack/ }).click();
 
     // 3. Arrive at Pack Editor
     await expect(page.getByText('QUESTION PACK EDITOR')).toBeVisible();
 
     // Set Pack Title
     const titleInput = page.locator('input[value="New Custom Survey Pack"]');
-    await titleInput.fill('Family Gathering Trivia');
+    await titleInput.fill('Custom Pinoy Gathering Trivia');
 
     // Set Question 1 prompt
     const promptInput = page.getByPlaceholder('e.g. Name something found in a kitchen...');
     if (await promptInput.count() > 0) {
-      await promptInput.fill('Name something in the kitchen');
+      await promptInput.fill('Paboritong handa sa Pasko');
     }
 
     // Save Changes
@@ -58,15 +73,15 @@ test.describe('Family Feud Game Show End-to-End Tests', () => {
     // Return to Packs Library
     await page.getByText('Packs Library').click();
     await expect(page.getByText('QUESTION PACK LIBRARY')).toBeVisible();
-    await expect(page.getByText('Family Gathering Trivia')).toBeVisible();
+    await expect(page.getByText('Custom Pinoy Gathering Trivia').first()).toBeVisible();
 
     // Go to Setup and select the newly created pack
     await page.goto('/#/setup');
     await expect(page.getByText('GAME SETUP')).toBeVisible();
-    await expect(page.getByText('Family Gathering Trivia').first()).toBeVisible();
+    await expect(page.getByText('Custom Pinoy Gathering Trivia').first()).toBeVisible();
 
     // Select the pack
-    await page.getByText('Family Gathering Trivia').first().click();
+    await page.getByText('Custom Pinoy Gathering Trivia').first().click();
 
     // START GAME NOW is enabled
     const startBtn = page.getByRole('button', { name: 'START GAME NOW' });
@@ -77,37 +92,17 @@ test.describe('Family Feud Game Show End-to-End Tests', () => {
     await expect(page.getByText('HOST CONSOLE')).toBeVisible();
   });
 
-  test('TV Display controls, answer un-reveal/hide, strikes, and multi-screen sync work correctly', async ({ page }) => {
-    // 1. Create a custom pack first to play with
-    await page.goto('/#/packs');
-    await page.getByRole('button', { name: 'Create New Pack' }).click();
-    await expect(page.getByText('QUESTION PACK EDITOR')).toBeVisible();
-
-    const titleInput = page.locator('input[value="New Custom Survey Pack"]');
-    await titleInput.fill('Game Night Special');
-
-    // Add prompt & answers
-    const textarea = page.locator('textarea');
-    if (await textarea.count() > 0) {
-      await textarea.fill('Name something found in a refrigerator');
-    }
-
-    // Add a second question so navigation between questions works
-    await page.getByRole('button', { name: 'Add' }).first().click();
-
-    await page.getByRole('button', { name: 'Save Changes' }).click();
-    await expect(page.getByText('Saved successfully!')).toBeVisible();
-
-    // 2. Launch game with this pack
+  test('TV Display controls, answer reveal, answer un-reveal/hide, strikes, and multi-screen sync work correctly', async ({ page }) => {
+    // 1. Go to Setup and choose a Filipino pack
     await page.goto('/#/setup');
     await expect(page.getByText('GAME SETUP')).toBeVisible();
-    await page.getByText('Game Night Special').first().click();
+    await page.getByText('Certified Pinoy Moments').first().click();
     await page.getByRole('button', { name: 'START GAME NOW' }).click();
 
-    // 3. Host console loads
+    // 2. Host console loads
     await expect(page.getByText('HOST CONSOLE')).toBeVisible();
 
-    // 4. Verify TV toolbar elements are present
+    // 3. Verify TV toolbar elements are present
     await expect(page.getByText('TV Display:')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Open TV Display' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Reconnect Display' })).toBeVisible();
@@ -115,11 +110,11 @@ test.describe('Family Feud Game Show End-to-End Tests', () => {
     await expect(page.getByRole('button', { name: 'Fullscreen TV' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Close TV Display' })).toBeVisible();
 
-    // 5. Resolve Face-Off so we are in Regular Play
+    // 4. Resolve Face-Off so we are in Regular Play
     await page.getByText('They PLAY the Board').first().click();
     await expect(page.getByText('Controlling Team:')).toBeVisible();
 
-    // 6. Reveal an answer, then test Hide (un-reveal)
+    // 5. Reveal an answer, then test Hide (un-reveal)
     const revealBtns = page.getByRole('button', { name: 'Reveal', exact: true });
     if (await revealBtns.count() > 0) {
       await revealBtns.first().click();
@@ -134,12 +129,12 @@ test.describe('Family Feud Game Show End-to-End Tests', () => {
       await expect(page.getByRole('button', { name: 'Reveal', exact: true }).first()).toBeVisible();
     }
 
-    // 7. Test Question navigation
+    // 6. Test Question navigation
     const nextBtn = page.getByRole('button', { name: 'Next' });
     await expect(nextBtn).toBeVisible();
     await nextBtn.click();
 
-    // 8. Test End Game Confirmation Modal
+    // 7. Test End Game Confirmation Modal
     const endGameBtn = page.getByRole('button', { name: 'End Game' });
     await expect(endGameBtn).toBeVisible();
     await endGameBtn.click();
