@@ -141,6 +141,13 @@ export async function listQuestionPacks(): Promise<QuestionPack[]> {
     if (packs.length === 0) {
       return [...FILIPINO_BUILTIN_PACKS].sort((a, b) => a.title.localeCompare(b.title));
     }
+    const packIds = new Set(packs.map((p) => p.id));
+    for (const builtin of FILIPINO_BUILTIN_PACKS) {
+      if (!packIds.has(builtin.id)) {
+        packs.push(builtin);
+        await db.questionPacks.put(builtin).catch(() => {});
+      }
+    }
     return packs.sort((a, b) => a.title.localeCompare(b.title));
   } catch (err) {
     console.error('Failed to list question packs:', err);

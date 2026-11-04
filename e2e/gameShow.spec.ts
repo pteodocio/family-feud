@@ -19,6 +19,7 @@ test.describe('Family Feud Game Show End-to-End Tests', () => {
     // Filipino packs should be loaded (including new packs)
     await expect(page.getByText('Mga Linyahan ni Mama').first()).toBeVisible();
     await expect(page.getByText('Sino Nagubos Nito?').first()).toBeVisible();
+    await expect(page.getByText('Elementary Days').first()).toBeVisible();
     await expect(page.getByText('Picture Muna Bago Kain').first()).toBeVisible();
 
     // Test search filter

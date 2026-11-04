@@ -5,8 +5,10 @@ import { PACKS_11_TO_15 } from './pack11to15';
 import { PACKS_16_TO_20 } from './pack16to20';
 import { PACKS_21_TO_25 } from './pack21to25';
 import { PACKS_26_TO_31 } from './pack26to31';
+import { PACKS_32_TO_39 } from './pack32to39';
 
 export const FILIPINO_NEW_6_PACKS: QuestionPack[] = PACKS_26_TO_31;
+export const FILIPINO_NEW_8_PACKS: QuestionPack[] = PACKS_32_TO_39;
 
 export const FILIPINO_BUILTIN_PACKS: QuestionPack[] = [
   ...PACKS_1_TO_5,
@@ -15,6 +17,7 @@ export const FILIPINO_BUILTIN_PACKS: QuestionPack[] = [
   ...PACKS_16_TO_20,
   ...PACKS_21_TO_25,
   ...PACKS_26_TO_31,
+  ...PACKS_32_TO_39,
 ];
 
 // Alias for backwards compatibility

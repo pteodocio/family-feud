@@ -2,27 +2,29 @@ import { describe, it, expect } from 'vitest';
 import {
   FILIPINO_BUILTIN_PACKS,
   FILIPINO_NEW_6_PACKS,
+  FILIPINO_NEW_8_PACKS,
   validateQuestionPackIntegrity,
 } from './index';
 
 describe('Filipino Question Packs Validation', () => {
-  it('contains exactly 31 built-in packs (25 original + 6 new)', () => {
-    expect(FILIPINO_BUILTIN_PACKS.length).toBe(31);
+  it('contains exactly 39 built-in packs (25 original + 6 + 8 new)', () => {
+    expect(FILIPINO_BUILTIN_PACKS.length).toBe(39);
     expect(FILIPINO_NEW_6_PACKS.length).toBe(6);
+    expect(FILIPINO_NEW_8_PACKS.length).toBe(8);
   });
 
-  it('contains exactly 155 questions total (5 per pack)', () => {
+  it('contains exactly 195 questions total (5 per pack)', () => {
     let totalQuestions = 0;
     for (const pack of FILIPINO_BUILTIN_PACKS) {
       expect(pack.questions.length).toBe(5);
       totalQuestions += pack.questions.length;
     }
-    expect(totalQuestions).toBe(155);
+    expect(totalQuestions).toBe(195);
   });
 
-  it('verifies the 6 new packs have exactly 30 questions, 3-5 answers, 100 points descending', () => {
+  it('verifies the 8 new packs have exactly 40 questions, 3-5 answers, 100 points descending', () => {
     let newQuestionsCount = 0;
-    for (const pack of FILIPINO_NEW_6_PACKS) {
+    for (const pack of FILIPINO_NEW_8_PACKS) {
       expect(pack.questions.length).toBe(5);
       newQuestionsCount += pack.questions.length;
 
@@ -38,25 +40,27 @@ describe('Filipino Question Packs Validation', () => {
         }
       }
     }
-    expect(newQuestionsCount).toBe(30);
+    expect(newQuestionsCount).toBe(40);
   });
 
-  it('passes comprehensive data integrity check with zero errors across all 31 packs', () => {
+  it('passes comprehensive data integrity check with zero errors across all 39 packs', () => {
     const report = validateQuestionPackIntegrity(FILIPINO_BUILTIN_PACKS);
     expect(report.errors).toEqual([]);
     expect(report.isValid).toBe(true);
-    expect(report.packCount).toBe(31);
-    expect(report.questionCount).toBe(155);
-    expect(report.answerCount).toBeGreaterThanOrEqual(465); // At least 3 * 155
+    expect(report.packCount).toBe(39);
+    expect(report.questionCount).toBe(195);
+    expect(report.answerCount).toBeGreaterThanOrEqual(585); // At least 3 * 195
   });
 
-  it('verifies all 6 new specific pack titles match requirements', () => {
-    const titles = FILIPINO_NEW_6_PACKS.map((p) => p.title);
-    expect(titles).toContain('Sino Nagubos Nito?');
-    expect(titles).toContain('Picture Muna Bago Kain');
-    expect(titles).toContain('Tamang Hinala');
-    expect(titles).toContain('Group Project Survivor');
-    expect(titles).toContain('Ay, Nakakahiya!');
-    expect(titles).toContain('Teka Lang, Naglo-loading');
+  it('verifies all 8 new specific pack titles match requirements', () => {
+    const titles = FILIPINO_NEW_8_PACKS.map((p) => p.title);
+    expect(titles).toContain('Elementary Days');
+    expect(titles).toContain('Mga Larong Kalye');
+    expect(titles).toContain('Palengke Adventures');
+    expect(titles).toContain('Birthday Party sa Pinas');
+    expect(titles).toContain('Fast Food Favorites');
+    expect(titles).toContain('Online Shopping Budol');
+    expect(titles).toContain('Karinderya Chronicles');
+    expect(titles).toContain('Mga Bagay na Laging Mayroon sa Bahay');
   });
 });
