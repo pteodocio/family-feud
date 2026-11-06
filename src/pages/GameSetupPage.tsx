@@ -5,6 +5,7 @@ import { useGameStore } from '../store/gameStore';
 import { listQuestionPacks, loadSettings, saveGameSession, initializeDatabase } from '../db/database';
 import type { QuestionPack, GameConfig, Question } from '../types/game';
 import { createGameSession } from '../engine/gameEngine';
+import { getPackTheme } from '../data/filipinoPacks/packTheme';
 
 export function GameSetupPage() {
   const { navigate } = useRouter();
@@ -318,6 +319,7 @@ export function GameSetupPage() {
                     <div className="flex-1 flex flex-col gap-2.5 overflow-y-auto max-h-[260px] pr-1">
                       {filteredPacks.map((pack) => {
                         const isSelected = pack.id === selectedPackId;
+                        const theme = getPackTheme(pack.title);
                         return (
                           <div
                             key={pack.id}
@@ -325,7 +327,7 @@ export function GameSetupPage() {
                             className={`p-3 rounded-xl border-2 cursor-pointer transition-all ${
                               isSelected
                                 ? 'bg-[#0f2c69] border-feud-gold shadow-gold-glow'
-                                : 'bg-[#05112e] border-blue-900 hover:border-blue-700'
+                                : `bg-[#05112e] border-blue-900 ${theme.accentBorder}`
                             }`}
                           >
                             <div className="flex items-center justify-between mb-1">
@@ -336,7 +338,7 @@ export function GameSetupPage() {
                               {pack.description}
                             </p>
                             <div className="flex items-center gap-2 text-[10px]">
-                              <span className="bg-blue-950 px-2 py-0.5 rounded border border-blue-800 text-blue-300 font-semibold">
+                              <span className={`${theme.badgeBg} ${theme.badgeBorder} ${theme.badgeText} px-2 py-0.5 rounded border font-semibold`}>
                                 {pack.category}
                               </span>
                               <span className="text-gray-300 font-mono">{pack.questions.length} Questions</span>

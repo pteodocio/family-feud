@@ -6,9 +6,13 @@ import { PACKS_16_TO_20 } from './pack16to20';
 import { PACKS_21_TO_25 } from './pack21to25';
 import { PACKS_26_TO_31 } from './pack26to31';
 import { PACKS_32_TO_39 } from './pack32to39';
+import { PACKS_40_TO_49 } from './pack40to49';
+import { PACKS_50_TO_61 } from './pack50to61';
 
 export const FILIPINO_NEW_6_PACKS: QuestionPack[] = PACKS_26_TO_31;
 export const FILIPINO_NEW_8_PACKS: QuestionPack[] = PACKS_32_TO_39;
+export const FILIPINO_SCENARIO_10_PACKS: QuestionPack[] = PACKS_40_TO_49;
+export const VARIETY_12_PACKS: QuestionPack[] = PACKS_50_TO_61;
 
 export const FILIPINO_BUILTIN_PACKS: QuestionPack[] = [
   ...PACKS_1_TO_5,
@@ -18,6 +22,8 @@ export const FILIPINO_BUILTIN_PACKS: QuestionPack[] = [
   ...PACKS_21_TO_25,
   ...PACKS_26_TO_31,
   ...PACKS_32_TO_39,
+  ...PACKS_40_TO_49,
+  ...PACKS_50_TO_61,
 ];
 
 // Alias for backwards compatibility
@@ -53,8 +59,8 @@ export function validateQuestionPackIntegrity(packs: QuestionPack[]): {
       }
       seenQuestionIds.add(q.id);
 
-      if (q.answers.length < 3 || q.answers.length > 5) {
-        errors.push(`Question ${q.id} has ${q.answers.length} answers, expected 3 to 5`);
+      if (q.answers.length < 3 || q.answers.length > 6) {
+        errors.push(`Question ${q.id} has ${q.answers.length} answers, expected 3 to 6`);
       }
 
       const sumPoints = q.answers.reduce((acc, a) => acc + a.points, 0);

@@ -17,6 +17,7 @@ import { useRouter } from '../router/Router';
 import { listQuestionPacks, saveQuestionPack, deleteQuestionPack, initializeDatabase } from '../db/database';
 import { QuestionPackSchema } from '../types/game';
 import type { QuestionPack } from '../types/game';
+import { getPackTheme } from '../data/filipinoPacks/packTheme';
 
 export function PackLibraryPage() {
   const { navigate } = useRouter();
@@ -365,10 +366,12 @@ export function PackLibraryPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredPacks.map((pack) => (
+            {filteredPacks.map((pack) => {
+              const theme = getPackTheme(pack.title);
+              return (
               <div
                 key={pack.id}
-                className="bg-[#071638] border-2 border-blue-900/80 hover:border-feud-gold/70 rounded-2xl p-5 shadow-lg flex flex-col justify-between transition-all group"
+                className={`bg-[#071638] border-2 border-blue-900/80 ${theme.accentBorder} hover:border-feud-gold/70 rounded-2xl p-5 shadow-lg flex flex-col justify-between transition-all group`}
               >
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-2">
@@ -376,7 +379,7 @@ export function PackLibraryPage() {
                       {pack.title}
                     </h3>
                     <span className="bg-blue-950 text-blue-300 border border-blue-800 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0">
-                      Custom
+                      {pack.isBuiltIn ? 'Built-in' : 'Custom'}
                     </span>
                   </div>
 
@@ -385,7 +388,7 @@ export function PackLibraryPage() {
                   </p>
 
                   <div className="flex items-center gap-2 text-[11px] text-gray-400 mb-4">
-                    <span className="bg-blue-950/80 px-2.5 py-0.5 rounded border border-blue-800 text-blue-300 font-semibold">
+                    <span className={`${theme.badgeBg} ${theme.badgeBorder} ${theme.badgeText} px-2.5 py-0.5 rounded border font-semibold`}>
                       {pack.category}
                     </span>
                     <span>{pack.questions.length} Questions</span>
@@ -441,7 +444,8 @@ export function PackLibraryPage() {
                   </div>
                 </div>
               </div>
-            ))}
+            );
+          })}
           </div>
         )}
       </div>
