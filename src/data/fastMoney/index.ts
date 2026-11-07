@@ -1,4 +1,8 @@
 import { FAST_MONEY_SETS, type FastMoneySet } from './fastMoneySets';
+import {
+  resolveFastMoneyConflicts,
+  type PlayedQuestionRecord,
+} from '../../engine/questionConflictDetector';
 
 export { FAST_MONEY_SETS, type FastMoneySet } from './fastMoneySets';
 
@@ -17,6 +21,57 @@ export function getRandomFastMoneySet(playedSetIds: string[] = []): FastMoneySet
   const pool = available.length > 0 ? available : FAST_MONEY_SETS;
   const randomIndex = Math.floor(Math.random() * pool.length);
   return pool[randomIndex];
+}
+
+/**
+ * Retrieves a guaranteed clean, conflict-free Fast Money set.
+ * Compares against all played regular-round questions.
+ * Replaces any conflicting questions with clean questions from the bank.
+ * Never falls back to regular-round questions.
+ */
+export function getCleanFastMoneySet(
+  setIdOrRandom?: string,
+  playedQuestions: PlayedQuestionRecord[] = []
+): {
+  set: FastMoneySet | null;
+  replacedCount: number;
+  replacedQuestions: Array<{ originalPrompt: string; replacementPrompt: string; reason: string }>;
+  error?: string;
+} {
+  if (!FAST_MONEY_SETS || FAST_MONEY_SETS.length === 0) {
+    return {
+      set: null,
+      replacedCount: 0,
+      replacedQuestions: [],
+      error: 'Fast Money question bank is unavailable or empty. Cannot load regular-round questions.',
+    };
+  }
+
+  let baseSet: FastMoneySet | undefined;
+  if (setIdOrRandom && setIdOrRandom !== 'random') {
+    baseSet = getFastMoneySetById(setIdOrRandom);
+  }
+
+  if (!baseSet) {
+    baseSet = FAST_MONEY_SETS[0];
+  }
+
+  const result = resolveFastMoneyConflicts(baseSet, playedQuestions, FAST_MONEY_SETS);
+
+  if (result.error || !result.resolvedSet) {
+    return {
+      set: null,
+      replacedCount: 0,
+      replacedQuestions: [],
+      error: result.error || 'Failed to resolve clean Fast Money set.',
+    };
+  }
+
+  return {
+    set: result.resolvedSet,
+    replacedCount: result.replacedCount,
+    replacedQuestions: result.replacedQuestions,
+  };
 }
 
 /**

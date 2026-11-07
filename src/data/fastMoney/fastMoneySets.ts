@@ -1,11 +1,5 @@
-import type { Question } from '../../types/game';
-
-export interface FastMoneySet {
-  id: string;
-  title: string;
-  description: string;
-  questions: Question[];
-}
+import type { FastMoneySet } from '../../types/game';
+export type { FastMoneySet };
 
 export const FAST_MONEY_SETS: FastMoneySet[] = [
   // ==========================================

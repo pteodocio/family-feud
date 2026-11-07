@@ -920,8 +920,34 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
           </div>
         )}
 
+        {/* PHASE 5: FAST MONEY ERROR BANNER */}
+        {session.phase === GamePhase.FAST_MONEY && session.fastMoneyError && (
+          <div className="bg-red-950/90 border-2 border-red-500 rounded-2xl p-5 shadow-stage flex items-start gap-4">
+            <AlertTriangle className="w-8 h-8 text-red-400 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h2 className="font-display font-black text-xl text-red-100 uppercase tracking-wide">
+                Fast Money Bank Unavailable
+              </h2>
+              <p className="text-sm text-red-200 mt-1">
+                {session.fastMoneyError}
+              </p>
+              <p className="text-xs text-red-300/80 mt-2">
+                Fast Money strictly prohibits using or falling back to regular-round questions.
+              </p>
+              <div className="mt-3">
+                <button
+                  onClick={() => setShowFmSetModal(true)}
+                  className="bg-red-900 hover:bg-red-800 text-white font-bold text-xs px-3 py-1.5 rounded-lg border border-red-400 transition-colors"
+                >
+                  Choose Another Set
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* PHASE 5: FAST MONEY HOST CONTROLS */}
-        {session.phase === GamePhase.FAST_MONEY && session.fastMoney && (
+        {session.phase === GamePhase.FAST_MONEY && session.fastMoney && !session.fastMoneyError && (
           <div className="bg-[#071638] border-2 border-feud-gold rounded-2xl p-4 sm:p-5 shadow-stage flex flex-col gap-4">
             {/* Top Bar: Set Info, Question Set Switcher, and Reset */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-blue-900 pb-3">
@@ -1541,7 +1567,7 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
                   const q = fmSearchQuery.toLowerCase();
                   return (
                     s.title.toLowerCase().includes(q) ||
-                    s.description.toLowerCase().includes(q) ||
+                    (s.description?.toLowerCase().includes(q) ?? false) ||
                     s.questions.some(
                       (item) =>
                         item.prompt.toLowerCase().includes(q) ||

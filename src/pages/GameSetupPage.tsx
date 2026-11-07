@@ -6,6 +6,7 @@ import { listQuestionPacks, loadSettings, saveGameSession, initializeDatabase } 
 import type { QuestionPack, GameConfig, Question } from '../types/game';
 import { createGameSession } from '../engine/gameEngine';
 import { getPackTheme } from '../data/filipinoPacks/packTheme';
+import { getCleanFastMoneySet } from '../data/fastMoney';
 
 export function GameSetupPage() {
   const { navigate } = useRouter();
@@ -57,14 +58,19 @@ export function GameSetupPage() {
 
     const actualRoundsCount = Math.min(roundsCount, availableQuestions.length);
 
-    // Split questions into regular rounds and 5 Fast Money questions
+    // Regular round questions strictly separated from Fast Money
     const regularQuestions = availableQuestions.slice(0, actualRoundsCount);
 
-    // Pick 5 questions for Fast Money (or fallback to whatever is available)
-    const fastMoneyQuestions =
-      availableQuestions.length >= actualRoundsCount + 5
-        ? availableQuestions.slice(actualRoundsCount, actualRoundsCount + 5)
-        : availableQuestions.slice(0, 5);
+    // Fast Money is strictly independent from regular round packs
+    const cleanFmResult = getCleanFastMoneySet(
+      'fm_set_01',
+      regularQuestions.map((q) => ({ id: q.id, prompt: q.prompt, answers: q.answers.map((a) => a.text) }))
+    );
+
+    if (!cleanFmResult.set) {
+      alert(cleanFmResult.error || 'Fast Money question bank is unavailable. Cannot start game.');
+      return;
+    }
 
     const multipliers = [1, 1, 2, 3, 3, 3].slice(0, actualRoundsCount);
 
@@ -87,7 +93,7 @@ export function GameSetupPage() {
       team2Name: team2Name.trim() || 'Team 2',
       config,
       regularQuestions,
-      fastMoneyQuestions,
+      fastMoneySet: cleanFmResult.set,
       packId: pack.id,
     });
 

@@ -185,8 +185,8 @@ describe('Fast Money Stepper & Game Flow', () => {
         fastMoneyTarget: 200,
         faceOffTieRule: 'hostDecision',
       },
-      regularQuestions: sampleSet.questions,
-      fastMoneyQuestions: sampleSet.questions,
+      regularQuestions: FILIPINO_BUILTIN_PACKS[0].questions,
+      fastMoneySet: sampleSet,
       packId: 'test-pack',
     });
 

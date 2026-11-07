@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Maximize, Minimize } from 'lucide-react';
+import { Maximize, Minimize, AlertTriangle } from 'lucide-react';
 import { GamePhase } from '../types/game';
 import type { GameSession } from '../types/game';
 import { loadGameSession, loadSettings } from '../db/database';
@@ -316,12 +316,27 @@ export function DisplayPage({ gameId }: DisplayPageProps) {
         )}
 
         {/* FAST MONEY SCREEN */}
-        {session.phase === GamePhase.FAST_MONEY && session.fastMoney && (
+        {session.phase === GamePhase.FAST_MONEY && session.fastMoney && !session.fastMoneyError && (
           <FastMoneyBoard
             fastMoney={session.fastMoney}
             timerRemaining={timerState.remaining}
             timerRunning={timerState.running}
           />
+        )}
+
+        {/* FAST MONEY ERROR */}
+        {session.phase === GamePhase.FAST_MONEY && session.fastMoneyError && (
+          <div className="w-full max-w-2xl feud-board-outer shadow-stage my-8">
+            <div className="feud-board-inner p-8 flex flex-col items-center justify-center text-center">
+              <AlertTriangle className="w-16 h-16 text-red-500 mb-4 animate-pulse" />
+              <h2 className="text-2xl font-black font-display text-white uppercase tracking-wider mb-2">
+                Fast Money Unavailable
+              </h2>
+              <p className="text-red-300 font-medium text-sm max-w-md">
+                {session.fastMoneyError}
+              </p>
+            </div>
+          </div>
         )}
 
         {/* FINAL RESULTS SCREEN */}

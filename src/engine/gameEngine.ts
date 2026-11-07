@@ -14,6 +14,12 @@ import type {
   Team,
 } from '../types/game';
 import { matchAnswer, checkFastMoneyDuplicate } from './answerMatcher';
+import { FAST_MONEY_SETS } from '../data/fastMoney/fastMoneySets';
+import {
+  resolveFastMoneyConflicts,
+  isQuestionConflicting,
+  type PlayedQuestionRecord,
+} from './questionConflictDetector';
 
 export interface CreateGameParams {
   id: string;
@@ -22,7 +28,8 @@ export interface CreateGameParams {
   team2Name: string;
   config: GameConfig;
   regularQuestions: Question[];
-  fastMoneyQuestions: Question[];
+  fastMoneyQuestions?: Question[];
+  fastMoneySet?: FastMoneySet | null;
   packId: string;
 }
 
@@ -38,6 +45,7 @@ export function createGameSession(params: CreateGameParams): GameSession {
     config,
     regularQuestions,
     fastMoneyQuestions,
+    fastMoneySet,
     packId,
   } = params;
 
@@ -55,7 +63,9 @@ export function createGameSession(params: CreateGameParams): GameSession {
     color: 'red',
   };
 
-  const rounds: RoundState[] = regularQuestions.slice(0, config.roundsCount).map((q, idx) => ({
+  const playedQuestions: Question[] = regularQuestions.slice(0, config.roundsCount);
+
+  const rounds: RoundState[] = playedQuestions.map((q, idx) => ({
     roundIndex: idx,
     multiplier: config.multipliers[idx] ?? (idx === 2 ? 2 : idx >= 3 ? 3 : 1),
     question: q,
@@ -72,12 +82,61 @@ export function createGameSession(params: CreateGameParams): GameSession {
     awardedPoints: 0,
   }));
 
-  const initialFastMoney: FastMoneyState = createInitialFastMoneyState(
-    fastMoneyQuestions.slice(0, 5),
-    config.fastMoneyTarget,
-    config.fastMoneyTimer1,
-    config.fastMoneyTimer2
-  );
+  const playedQuestionHistory: PlayedQuestionRecord[] = playedQuestions.map((q) => ({
+    id: q.id,
+    prompt: q.prompt,
+    answers: q.answers.map((a) => a.text),
+  }));
+
+  const playedQuestionIds: string[] = playedQuestions.map((q) => q.id);
+
+  // Strictly independent Fast Money initialization
+  let initialFastMoney: FastMoneyState | null = null;
+  let fastMoneyError: string | null = null;
+
+  if (!FAST_MONEY_SETS || FAST_MONEY_SETS.length === 0) {
+    fastMoneyError = 'Fast Money question bank is unavailable or empty. Cannot load regular-round questions.';
+  } else {
+    let targetSet: FastMoneySet | null = null;
+
+    if (fastMoneySet) {
+      targetSet = fastMoneySet;
+    } else if (fastMoneyQuestions && fastMoneyQuestions.length >= 5) {
+      // Allow custom Fast Money questions only if they strictly do NOT conflict with regular questions
+      const hasConflict = fastMoneyQuestions.some((fmQ) =>
+        isQuestionConflicting(fmQ, playedQuestionHistory).isConflict
+      );
+      if (!hasConflict) {
+        targetSet = {
+          id: 'fm_custom',
+          title: 'Custom Fast Money Set',
+          description: 'Custom questions set',
+          questions: fastMoneyQuestions.slice(0, 5),
+        };
+      }
+    }
+
+    if (!targetSet) {
+      targetSet = FAST_MONEY_SETS[0];
+    }
+
+    const conflictResult = resolveFastMoneyConflicts(targetSet, playedQuestionHistory, FAST_MONEY_SETS);
+    if (conflictResult.resolvedSet) {
+      initialFastMoney = {
+        ...createInitialFastMoneyState(
+          conflictResult.resolvedSet.questions,
+          config.fastMoneyTarget,
+          config.fastMoneyTimer1,
+          config.fastMoneyTimer2
+        ),
+        setId: conflictResult.resolvedSet.id,
+        setTitle: conflictResult.resolvedSet.title,
+        step: 'setup',
+      };
+    } else {
+      fastMoneyError = conflictResult.error || 'Failed to initialize conflict-free Fast Money set.';
+    }
+  }
 
   return {
     id,
@@ -90,6 +149,9 @@ export function createGameSession(params: CreateGameParams): GameSession {
     rounds,
     currentRoundIndex: 0,
     fastMoney: initialFastMoney,
+    fastMoneyError,
+    playedQuestionIds,
+    playedQuestionHistory,
     winnerTeamId: null,
     scoreAdjustments: [],
     actionLog: [`Game "${title}" started with ${team1.name} vs ${team2.name}`],
@@ -530,18 +592,70 @@ export function advanceToNextRound(session: GameSession): GameSession {
       ? session.team1.id
       : session.team2.id;
 
-  const fastMoney = session.fastMoney
-    ? {
-        ...session.fastMoney,
+  const played: PlayedQuestionRecord[] =
+    session.playedQuestionHistory && session.playedQuestionHistory.length > 0
+      ? session.playedQuestionHistory
+      : session.rounds.map((r) => ({
+          id: r.question.id,
+          prompt: r.question.prompt,
+          answers: r.question.answers.map((a) => a.text),
+        }));
+
+  let fastMoney = session.fastMoney;
+  let fastMoneyError = session.fastMoneyError ?? null;
+
+  if (!FAST_MONEY_SETS || FAST_MONEY_SETS.length === 0) {
+    fastMoney = null;
+    fastMoneyError =
+      'Fast Money question bank is unavailable or empty. Cannot load regular-round questions.';
+  } else if (!fastMoney || !fastMoney.setId) {
+    const validation = resolveFastMoneyConflicts(FAST_MONEY_SETS[0], played, FAST_MONEY_SETS);
+    if (validation.resolvedSet) {
+      fastMoney = {
+        ...createInitialFastMoneyState(
+          validation.resolvedSet.questions,
+          session.config.fastMoneyTarget,
+          session.config.fastMoneyTimer1,
+          session.config.fastMoneyTimer2
+        ),
+        setId: validation.resolvedSet.id,
+        setTitle: validation.resolvedSet.title,
         winningTeamId,
-      }
-    : null;
+        step: 'setup',
+      };
+      fastMoneyError = null;
+    } else {
+      fastMoney = null;
+      fastMoneyError = validation.error || 'Failed to initialize conflict-free Fast Money questions.';
+    }
+  } else {
+    // Re-validate existing fastMoney against played questions
+    const currentSet: FastMoneySet = {
+      id: fastMoney.setId,
+      title: fastMoney.setTitle || 'Fast Money Set',
+      description: '',
+      questions: fastMoney.questions,
+    };
+    const validation = resolveFastMoneyConflicts(currentSet, played, FAST_MONEY_SETS);
+    if (validation.resolvedSet) {
+      fastMoney = {
+        ...fastMoney,
+        questions: validation.resolvedSet.questions,
+        winningTeamId,
+      };
+      fastMoneyError = null;
+    } else {
+      fastMoney = null;
+      fastMoneyError = validation.error || 'Conflict detected in Fast Money questions.';
+    }
+  }
 
   return {
     ...session,
     phase: GamePhase.FAST_MONEY,
     winnerTeamId: winningTeamId,
     fastMoney,
+    fastMoneyError,
     actionLog: [
       ...session.actionLog,
       `Regular rounds complete! ${
@@ -567,14 +681,31 @@ export function navigateToRound(session: GameSession, targetRoundIndex: number):
     ? GamePhase.REGULAR
     : GamePhase.FACEOFF;
 
+  const currentPlayedHistory = session.playedQuestionHistory || [];
+  const currentPlayedIds = session.playedQuestionIds || [];
+
+  const updatedHistory = currentPlayedIds.includes(targetRound.question.id)
+    ? currentPlayedHistory
+    : [
+        ...currentPlayedHistory,
+        {
+          id: targetRound.question.id,
+          prompt: targetRound.question.prompt,
+          answers: targetRound.question.answers.map((a) => a.text),
+        },
+      ];
+
+  const updatedIds = currentPlayedIds.includes(targetRound.question.id)
+    ? currentPlayedIds
+    : [...currentPlayedIds, targetRound.question.id];
+
   return {
     ...session,
-    currentRoundIndex: targetRoundIndex,
     phase,
-    actionLog: [
-      ...session.actionLog,
-      `Host navigated to Round ${targetRoundIndex + 1} (${targetRound.multiplier}x points)`,
-    ],
+    currentRoundIndex: targetRoundIndex,
+    playedQuestionHistory: updatedHistory,
+    playedQuestionIds: updatedIds,
+    actionLog: [...session.actionLog, `Host navigated to Round ${targetRoundIndex + 1}`],
     updatedAt: new Date().toISOString(),
   };
 }
@@ -748,16 +879,49 @@ export function resolveFastMoney(session: GameSession): GameSession {
 
 /**
  * Load a complete Fast Money set (questions, set title/id) into the session.
+ * Validates against played questions and replaces any conflicting questions.
+ * If the question bank is unavailable or empty, does not start and sets fastMoneyError.
  */
 export function initFastMoneyWithSet(session: GameSession, set: FastMoneySet): GameSession {
   const targetScore = session.fastMoney?.targetScore ?? session.config.fastMoneyTarget ?? 200;
   const timer1 = session.config.fastMoneyTimer1 ?? 20;
   const timer2 = session.config.fastMoneyTimer2 ?? 25;
 
+  if (!FAST_MONEY_SETS || FAST_MONEY_SETS.length === 0) {
+    return {
+      ...session,
+      fastMoney: null,
+      fastMoneyError: 'Fast Money question bank is unavailable or empty. Cannot load regular-round questions.',
+      actionLog: [...session.actionLog, 'Failed to load Fast Money: question bank unavailable.'],
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  const played: PlayedQuestionRecord[] =
+    session.playedQuestionHistory && session.playedQuestionHistory.length > 0
+      ? session.playedQuestionHistory
+      : session.rounds.map((r) => ({
+          id: r.question.id,
+          prompt: r.question.prompt,
+          answers: r.question.answers.map((a) => a.text),
+        }));
+
+  const validation = resolveFastMoneyConflicts(set, played, FAST_MONEY_SETS);
+  if (validation.error || !validation.resolvedSet) {
+    return {
+      ...session,
+      fastMoney: null,
+      fastMoneyError: validation.error || 'Failed to initialize Fast Money set without conflicts.',
+      actionLog: [...session.actionLog, `Error loading Fast Money set: ${validation.error}`],
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  const cleanSet = validation.resolvedSet;
   const newFastMoney: FastMoneyState = {
-    ...createInitialFastMoneyState(set.questions.slice(0, 5), targetScore, timer1, timer2),
-    setId: set.id,
-    setTitle: set.title,
+    ...createInitialFastMoneyState(cleanSet.questions.slice(0, 5), targetScore, timer1, timer2),
+    setId: cleanSet.id,
+    setTitle: cleanSet.title,
     step: 'setup',
     currentQuestionIndex: 0,
     passedIndices: [],
@@ -765,10 +929,16 @@ export function initFastMoneyWithSet(session: GameSession, set: FastMoneySet): G
     winningTeamId: session.fastMoney?.winningTeamId ?? null,
   };
 
+  const actionNotice =
+    validation.replacedCount > 0
+      ? `Loaded Fast Money set: "${cleanSet.title}" (${validation.replacedCount} conflicting question(s) auto-replaced with clean questions)`
+      : `Loaded Fast Money set: "${cleanSet.title}"`;
+
   return {
     ...session,
     fastMoney: newFastMoney,
-    actionLog: [...session.actionLog, `Loaded Fast Money set: "${set.title}"`],
+    fastMoneyError: null,
+    actionLog: [...session.actionLog, actionNotice],
     updatedAt: new Date().toISOString(),
   };
 }

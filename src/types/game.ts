@@ -99,7 +99,7 @@ export interface RoundState {
 export interface FastMoneySet {
   id: string;
   title: string;
-  description: string;
+  description?: string;
   questions: Question[];
 }
 
@@ -180,6 +180,9 @@ export interface GameSession {
   winnerTeamId: string | null;
   scoreAdjustments: ScoreAdjustment[];
   actionLog: string[];
+  playedQuestionIds?: string[];
+  playedQuestionHistory?: Array<{ id: string; prompt: string; answers?: string[] }>;
+  fastMoneyError?: string | null;
   createdAt: string;
   updatedAt: string;
 }
