@@ -9,8 +9,11 @@ import type {
   RoundState,
   FastMoneyState,
   FastMoneyPlayerState,
+  FastMoneySet,
+  FastMoneyStep,
   Team,
 } from '../types/game';
+import { matchAnswer, checkFastMoneyDuplicate } from './answerMatcher';
 
 export interface CreateGameParams {
   id: string;
@@ -111,6 +114,8 @@ export function createInitialFastMoneyState(
       matchedAnswerId: null,
       isAccepted: false,
       isRevealed: false,
+      isPassed: false,
+      rawInput: '',
     })),
     revealedAnswerIndices: [],
     revealedPointsIndices: [],
@@ -130,6 +135,10 @@ export function createInitialFastMoneyState(
     totalScore: 0,
     isCompleted: false,
     won: null,
+    step: 'setup',
+    currentQuestionIndex: 0,
+    passedIndices: [],
+    duplicateWarning: null,
   };
 }
 
@@ -733,6 +742,302 @@ export function resolveFastMoney(session: GameSession): GameSession {
         won ? 'VICTORY!' : 'Missed target score.'
       }`,
     ],
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Load a complete Fast Money set (questions, set title/id) into the session.
+ */
+export function initFastMoneyWithSet(session: GameSession, set: FastMoneySet): GameSession {
+  const targetScore = session.fastMoney?.targetScore ?? session.config.fastMoneyTarget ?? 200;
+  const timer1 = session.config.fastMoneyTimer1 ?? 20;
+  const timer2 = session.config.fastMoneyTimer2 ?? 25;
+
+  const newFastMoney: FastMoneyState = {
+    ...createInitialFastMoneyState(set.questions.slice(0, 5), targetScore, timer1, timer2),
+    setId: set.id,
+    setTitle: set.title,
+    step: 'setup',
+    currentQuestionIndex: 0,
+    passedIndices: [],
+    duplicateWarning: null,
+    winningTeamId: session.fastMoney?.winningTeamId ?? null,
+  };
+
+  return {
+    ...session,
+    fastMoney: newFastMoney,
+    actionLog: [...session.actionLog, `Loaded Fast Money set: "${set.title}"`],
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Start a player's round in Fast Money (starts their timer and sets active question to 0).
+ */
+export function startFastMoneyPlayer(session: GameSession, playerNum: 1 | 2): GameSession {
+  if (!session.fastMoney) return session;
+  const playerKey = playerNum === 1 ? 'player1' : 'player2';
+  const player = session.fastMoney[playerKey];
+  const defaultTimer =
+    playerNum === 1 ? (session.config.fastMoneyTimer1 ?? 20) : (session.config.fastMoneyTimer2 ?? 25);
+
+  const updatedPlayer: FastMoneyPlayerState = {
+    ...player,
+    timerRemaining: player.timerRemaining > 0 ? player.timerRemaining : defaultTimer,
+    timerRunning: true,
+    isFinished: false,
+  };
+
+  return {
+    ...session,
+    fastMoney: {
+      ...session.fastMoney,
+      activePlayer: playerNum,
+      step: playerNum === 1 ? 'player1_playing' : 'player2_playing',
+      currentQuestionIndex: 0,
+      passedIndices: [],
+      duplicateWarning: null,
+      [playerKey]: updatedPlayer,
+    },
+    actionLog: [...session.actionLog, `Started Fast Money round for Player ${playerNum}`],
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Passes the current question in Fast Money and advances to the next question.
+ */
+export function passFastMoneyQuestion(session: GameSession, playerNum: 1 | 2): GameSession {
+  if (!session.fastMoney) return session;
+  const currentIndex = session.fastMoney.currentQuestionIndex ?? 0;
+  const passedIndices = session.fastMoney.passedIndices ?? [];
+  const playerKey = playerNum === 1 ? 'player1' : 'player2';
+  const player = session.fastMoney[playerKey];
+
+  const newAnswers = [...player.answers];
+  newAnswers[currentIndex] = {
+    ...newAnswers[currentIndex],
+    isPassed: true,
+  };
+
+  const newPassed = passedIndices.includes(currentIndex)
+    ? passedIndices
+    : [...passedIndices, currentIndex];
+
+  // Find next unanswered or passed question:
+  // 1. Look ahead (currentIndex + 1 .. 4)
+  let nextIndex = -1;
+  for (let i = currentIndex + 1; i < 5; i++) {
+    const a = newAnswers[i];
+    if (!a.submittedText || a.isPassed) {
+      nextIndex = i;
+      break;
+    }
+  }
+
+  // 2. If none ahead, cycle back to earlier passed/unanswered questions
+  if (nextIndex === -1) {
+    for (let i = 0; i < 5; i++) {
+      if (i !== currentIndex && (!newAnswers[i].submittedText || newAnswers[i].isPassed)) {
+        nextIndex = i;
+        break;
+      }
+    }
+  }
+
+  // If still none, stay at currentIndex
+  if (nextIndex === -1) {
+    nextIndex = currentIndex;
+  }
+
+  return {
+    ...session,
+    fastMoney: {
+      ...session.fastMoney,
+      currentQuestionIndex: nextIndex,
+      passedIndices: newPassed,
+      duplicateWarning: null,
+      [playerKey]: {
+        ...player,
+        answers: newAnswers,
+      },
+    },
+    actionLog: [...session.actionLog, `Player ${playerNum} passed Question ${currentIndex + 1}`],
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Submits an answer for the active question stepper, checks duplicates for Player 2,
+ * calculates points, and advances to the next question.
+ */
+export function submitFastMoneyStepAnswer(
+  session: GameSession,
+  playerNum: 1 | 2,
+  text: string,
+  allowDuplicateOverride: boolean = false
+): { session: GameSession; isDuplicate: boolean } {
+  if (!session.fastMoney) return { session, isDuplicate: false };
+
+  const currentIndex = session.fastMoney.currentQuestionIndex ?? 0;
+  const question = session.fastMoney.questions[currentIndex];
+  if (!question) return { session, isDuplicate: false };
+
+  const playerKey = playerNum === 1 ? 'player1' : 'player2';
+  const player = session.fastMoney[playerKey];
+
+  const trimmed = text.trim();
+  const match = matchAnswer(question, trimmed);
+
+  // Check duplicate for Player 2
+  if (playerNum === 2 && !allowDuplicateOverride) {
+    const p1Answer = session.fastMoney.player1.answers[currentIndex];
+    const isDup = checkFastMoneyDuplicate(
+      p1Answer?.submittedText ?? '',
+      p1Answer?.matchedAnswerId ?? null,
+      trimmed,
+      match.matchedAnswer?.id ?? null
+    );
+
+    if (isDup) {
+      const updatedSession: GameSession = {
+        ...session,
+        fastMoney: {
+          ...session.fastMoney,
+          duplicateWarning: `Duplicate answer "${trimmed}"! Contestant must give another answer.`,
+        },
+      };
+      return { session: updatedSession, isDuplicate: true };
+    }
+  }
+
+  const newAnswers = [...player.answers];
+  newAnswers[currentIndex] = {
+    ...newAnswers[currentIndex],
+    submittedText: trimmed,
+    points: match.points,
+    matchedAnswerId: match.matchedAnswer?.id ?? null,
+    isAccepted: match.isMatch,
+    isPassed: false,
+    rawInput: trimmed,
+  };
+
+  const totalScore = newAnswers.reduce((sum, a) => sum + (a.isAccepted ? a.points : 0), 0);
+  const newPassed = (session.fastMoney.passedIndices ?? []).filter((idx) => idx !== currentIndex);
+
+  // Find next unanswered or passed question
+  let nextIndex = -1;
+  // Look forward
+  for (let i = currentIndex + 1; i < 5; i++) {
+    if (!newAnswers[i].submittedText || newAnswers[i].isPassed) {
+      nextIndex = i;
+      break;
+    }
+  }
+  // Look backward
+  if (nextIndex === -1) {
+    for (let i = 0; i < currentIndex; i++) {
+      if (!newAnswers[i].submittedText || newAnswers[i].isPassed) {
+        nextIndex = i;
+        break;
+      }
+    }
+  }
+
+  const allAnswered = nextIndex === -1;
+  const nextStep = allAnswered
+    ? (playerNum === 1 ? 'player1_review' : 'player2_review')
+    : session.fastMoney.step;
+
+  const updatedPlayer: FastMoneyPlayerState = {
+    ...player,
+    answers: newAnswers,
+    totalScore,
+    isFinished: allAnswered,
+    timerRunning: allAnswered ? false : player.timerRunning,
+  };
+
+  const updatedFastMoney: FastMoneyState = {
+    ...session.fastMoney,
+    [playerKey]: updatedPlayer,
+    step: nextStep,
+    currentQuestionIndex: allAnswered ? currentIndex : nextIndex,
+    passedIndices: newPassed,
+    duplicateWarning: null,
+    totalScore:
+      playerNum === 1
+        ? totalScore + session.fastMoney.player2.totalScore
+        : session.fastMoney.player1.totalScore + totalScore,
+  };
+
+  return {
+    session: {
+      ...session,
+      fastMoney: updatedFastMoney,
+      actionLog: [
+        ...session.actionLog,
+        `Player ${playerNum} Q${currentIndex + 1}: "${trimmed}" (${match.points} pts)`,
+      ],
+      updatedAt: new Date().toISOString(),
+    },
+    isDuplicate: false,
+  };
+}
+
+/**
+ * Jump to a specific question index in Fast Money stepper.
+ */
+export function setFastMoneyQuestionIndex(session: GameSession, index: number): GameSession {
+  if (!session.fastMoney) return session;
+  return {
+    ...session,
+    fastMoney: {
+      ...session.fastMoney,
+      currentQuestionIndex: Math.max(0, Math.min(4, index)),
+      duplicateWarning: null,
+    },
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Manually switch the Fast Money phase/step.
+ */
+export function setFastMoneyStep(session: GameSession, step: FastMoneyStep): GameSession {
+  if (!session.fastMoney) return session;
+  return {
+    ...session,
+    fastMoney: {
+      ...session.fastMoney,
+      step,
+      duplicateWarning: null,
+    },
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Restart Fast Money round for the current set.
+ */
+export function restartFastMoneyRound(session: GameSession): GameSession {
+  if (!session.fastMoney) return session;
+  const questions = session.fastMoney.questions;
+  const targetScore = session.fastMoney.targetScore;
+  const timer1 = session.config.fastMoneyTimer1 ?? 20;
+  const timer2 = session.config.fastMoneyTimer2 ?? 25;
+
+  const fresh = createInitialFastMoneyState(questions, targetScore, timer1, timer2);
+  fresh.setId = session.fastMoney.setId;
+  fresh.setTitle = session.fastMoney.setTitle;
+  fresh.winningTeamId = session.fastMoney.winningTeamId;
+
+  return {
+    ...session,
+    phase: GamePhase.FAST_MONEY,
+    fastMoney: fresh,
+    actionLog: [...session.actionLog, 'Restarted Fast Money round'],
     updatedAt: new Date().toISOString(),
   };
 }

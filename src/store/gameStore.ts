@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { GamePhase } from '../types/game';
-import type { GameSession, SoundEffectName, BgmTrackName } from '../types/game';
+import type { GameSession, SoundEffectName, BgmTrackName, FastMoneySet, FastMoneyStep } from '../types/game';
 import { DEFAULT_SETTINGS, saveGameSession, loadGameSession, loadSettings, saveSettings } from '../db/database';
 import type { AppSettings } from '../db/database';
 import {
@@ -22,6 +22,13 @@ import {
   revealFastMoneyAnswer as engineRevealFastMoneyAnswer,
   revealFastMoneyPoints as engineRevealFastMoneyPoints,
   resolveFastMoney as engineResolveFastMoney,
+  initFastMoneyWithSet as engineInitFastMoneyWithSet,
+  startFastMoneyPlayer as engineStartFastMoneyPlayer,
+  passFastMoneyQuestion as enginePassFastMoneyQuestion,
+  submitFastMoneyStepAnswer as engineSubmitFastMoneyStepAnswer,
+  setFastMoneyQuestionIndex as engineSetFastMoneyQuestionIndex,
+  setFastMoneyStep as engineSetFastMoneyStep,
+  restartFastMoneyRound as engineRestartFastMoneyRound,
 } from '../engine/gameEngine';
 import { soundManager } from '../audio/soundManager';
 import { syncBus } from '../sync/broadcast';
@@ -77,6 +84,14 @@ interface GameStoreState {
   revealFastMoneyAnswer: (playerNum: 1 | 2, questionIndex: number) => void;
   revealFastMoneyPoints: (playerNum: 1 | 2, questionIndex: number) => void;
   resolveFastMoney: () => void;
+  initFastMoneyWithSet: (set: FastMoneySet) => void;
+  startFastMoneyPlayer: (playerNum: 1 | 2) => void;
+  submitFastMoneyStepAnswer: (playerNum: 1 | 2, text: string, allowDuplicateOverride?: boolean) => boolean;
+  passFastMoneyQuestion: (playerNum: 1 | 2) => void;
+  setFastMoneyQuestionIndex: (index: number) => void;
+  setFastMoneyStep: (step: FastMoneyStep) => void;
+  restartFastMoneyRound: () => void;
+  revealAllFastMoney: (playerNum: 1 | 2) => void;
   startFastMoneyTimer: (seconds: number) => void;
   pauseFastMoneyTimer: () => void;
   resetFastMoneyTimer: (seconds: number) => void;
@@ -458,6 +473,132 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     } else {
       get().playSound('wrong');
     }
+  },
+
+  initFastMoneyWithSet: (fastSet: FastMoneySet) => {
+    const { session, undoStack } = get();
+    if (!session) return;
+    const nextUndo = [...undoStack.slice(-MAX_UNDO_STACK), session];
+    const newSession = engineInitFastMoneyWithSet(session, fastSet);
+    const timer1 = session.config.fastMoneyTimer1 || 20;
+    set({
+      session: newSession,
+      undoStack: nextUndo,
+      fastMoneyTimer: { running: false, remaining: timer1 },
+    });
+    saveGameSession(newSession);
+    syncBus.broadcastState(newSession);
+    syncBus.broadcastTimer(timer1, false);
+  },
+
+  startFastMoneyPlayer: (playerNum: 1 | 2) => {
+    const { session, undoStack } = get();
+    if (!session || !session.fastMoney) return;
+    const seconds =
+      playerNum === 1
+        ? session.config.fastMoneyTimer1 || 20
+        : session.config.fastMoneyTimer2 || 25;
+    const nextUndo = [...undoStack.slice(-MAX_UNDO_STACK), session];
+    const newSession = engineStartFastMoneyPlayer(session, playerNum);
+    set({
+      session: newSession,
+      undoStack: nextUndo,
+      fastMoneyTimer: { running: true, remaining: seconds },
+    });
+    saveGameSession(newSession);
+    syncBus.broadcastState(newSession);
+    syncBus.broadcastTimer(seconds, true);
+  },
+
+  submitFastMoneyStepAnswer: (playerNum: 1 | 2, text: string, allowDuplicateOverride = false) => {
+    const { session, undoStack } = get();
+    if (!session || !session.fastMoney) return false;
+
+    const { session: newSession, isDuplicate } = engineSubmitFastMoneyStepAnswer(
+      session,
+      playerNum,
+      text,
+      allowDuplicateOverride
+    );
+
+    if (isDuplicate) {
+      get().playSound('strike');
+      set({ session: newSession });
+      saveGameSession(newSession);
+      syncBus.broadcastState(newSession);
+      return true;
+    }
+
+    const nextUndo = [...undoStack.slice(-MAX_UNDO_STACK), session];
+    set({ session: newSession, undoStack: nextUndo });
+    saveGameSession(newSession);
+    syncBus.broadcastState(newSession);
+
+    const playerKey = playerNum === 1 ? 'player1' : 'player2';
+    if (newSession.fastMoney && newSession.fastMoney[playerKey].isFinished) {
+      get().pauseFastMoneyTimer();
+    }
+
+    return false;
+  },
+
+  passFastMoneyQuestion: (playerNum: 1 | 2) => {
+    const { session, undoStack } = get();
+    if (!session || !session.fastMoney) return;
+    const nextUndo = [...undoStack.slice(-MAX_UNDO_STACK), session];
+    const newSession = enginePassFastMoneyQuestion(session, playerNum);
+    set({ session: newSession, undoStack: nextUndo });
+    saveGameSession(newSession);
+    syncBus.broadcastState(newSession);
+  },
+
+  setFastMoneyQuestionIndex: (index: number) => {
+    const { session } = get();
+    if (!session || !session.fastMoney) return;
+    const newSession = engineSetFastMoneyQuestionIndex(session, index);
+    set({ session: newSession });
+    saveGameSession(newSession);
+    syncBus.broadcastState(newSession);
+  },
+
+  setFastMoneyStep: (step: FastMoneyStep) => {
+    const { session } = get();
+    if (!session || !session.fastMoney) return;
+    const newSession = engineSetFastMoneyStep(session, step);
+    set({ session: newSession });
+    saveGameSession(newSession);
+    syncBus.broadcastState(newSession);
+  },
+
+  restartFastMoneyRound: () => {
+    const { session, undoStack } = get();
+    if (!session || !session.fastMoney) return;
+    const nextUndo = [...undoStack.slice(-MAX_UNDO_STACK), session];
+    const newSession = engineRestartFastMoneyRound(session);
+    const timer1 = session.config.fastMoneyTimer1 || 20;
+    set({
+      session: newSession,
+      undoStack: nextUndo,
+      fastMoneyTimer: { running: false, remaining: timer1 },
+    });
+    saveGameSession(newSession);
+    syncBus.broadcastState(newSession);
+    syncBus.broadcastTimer(timer1, false);
+  },
+
+  revealAllFastMoney: (playerNum: 1 | 2) => {
+    const { session, undoStack } = get();
+    if (!session || !session.fastMoney) return;
+    const nextUndo = [...undoStack.slice(-MAX_UNDO_STACK), session];
+    let current = session;
+    for (let i = 0; i < 5; i++) {
+      current = engineRevealFastMoneyAnswer(current, playerNum, i);
+      current = engineRevealFastMoneyPoints(current, playerNum, i);
+    }
+    set({ session: current, undoStack: nextUndo });
+    saveGameSession(current);
+    syncBus.broadcastState(current);
+    get().playSound('reveal');
   },
 
   startFastMoneyTimer: (seconds: number) => {

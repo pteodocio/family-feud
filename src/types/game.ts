@@ -95,6 +95,14 @@ export interface RoundState {
   awardedPoints: number;
 }
 
+// Fast Money Set Definition
+export interface FastMoneySet {
+  id: string;
+  title: string;
+  description: string;
+  questions: Question[];
+}
+
 // Fast Money Answer Submission
 export interface FastMoneyAnswerRecord {
   questionId: string;
@@ -104,6 +112,8 @@ export interface FastMoneyAnswerRecord {
   matchedAnswerId: string | null;
   isAccepted: boolean;
   isRevealed: boolean;
+  isPassed?: boolean;
+  rawInput?: string;
 }
 
 // Fast Money Player State
@@ -118,6 +128,16 @@ export interface FastMoneyPlayerState {
   totalScore: number;
 }
 
+// Fast Money Step / Flow State
+export type FastMoneyStep =
+  | 'setup'
+  | 'player1_playing'
+  | 'player1_review'
+  | 'player2_playing'
+  | 'player2_review'
+  | 'reveal'
+  | 'completed';
+
 // Fast Money Round State
 export interface FastMoneyState {
   questions: Question[];
@@ -129,6 +149,12 @@ export interface FastMoneyState {
   totalScore: number;
   isCompleted: boolean;
   won: boolean | null;
+  setId?: string;
+  setTitle?: string;
+  step?: FastMoneyStep;
+  currentQuestionIndex?: number;
+  passedIndices?: number[];
+  duplicateWarning?: string | null;
 }
 
 // Score Adjustment Record
