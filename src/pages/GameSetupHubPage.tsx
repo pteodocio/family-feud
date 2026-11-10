@@ -5,6 +5,7 @@ import { HubNavbar } from '../components/common/HubNavbar';
 import { getGameById } from '../games/registry';
 import { listHubPlayers, listHubTeams } from '../db/hubDatabase';
 import { PlayerManagerModal } from '../components/shared/PlayerManagerModal';
+import { DynamicContentGeneratorSection } from '../components/shared/DynamicContentGeneratorSection';
 import type { HubPlayer, HubTeam } from '../types/hub';
 import type { ScoreboardParticipant } from '../components/shared/SharedScoreboard';
 
@@ -23,6 +24,10 @@ export function GameSetupHubPage({ gameId }: GameSetupHubPageProps) {
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
   const [isPlayerManagerOpen, setIsPlayerManagerOpen] = useState(false);
   const [isTvWindowOpened, setIsTvWindowOpened] = useState(false);
+
+  const handleContentReady = (items: any[]) => {
+    sessionStorage.setItem(`hub_custom_content_${gameId}`, JSON.stringify(items));
+  };
 
   const loadRoster = async () => {
     const [pList, tList] = await Promise.all([listHubPlayers(), listHubTeams()]);
@@ -174,6 +179,15 @@ export function GameSetupHubPage({ gameId }: GameSetupHubPageProps) {
             {isTvWindowOpened ? 'TV Display Connected' : 'Open TV Screen'}
           </button>
         </div>
+
+        {/* DYNAMIC CONTENT GENERATION & PREVIEW (EXCLUDING FAMILY FEUD) */}
+        {gameId !== 'family-feud' && (
+          <DynamicContentGeneratorSection
+            gameId={gameId}
+            gameTitle={game.name}
+            onContentReady={handleContentReady}
+          />
+        )}
 
         {/* ROSTER SELECTION SECTION */}
         <div className="p-5 sm:p-6 rounded-3xl bg-slate-900/60 border border-slate-800 mb-8 space-y-5">

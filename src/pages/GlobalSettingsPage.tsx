@@ -1,21 +1,51 @@
 import { useState, useEffect } from 'react';
-import { Settings, Volume2, Tv, ArrowLeft, Check, Keyboard, HardDrive, RefreshCw } from 'lucide-react';
+import { Settings, Volume2, Tv, ArrowLeft, Check, Keyboard, HardDrive, RefreshCw, Sparkles, Key } from 'lucide-react';
 import { useRouter } from '../router/Router';
 import { HubNavbar } from '../components/common/HubNavbar';
 import { loadSettings, saveSettings, type AppSettings, DEFAULT_SETTINGS, initializeDatabase } from '../db/database';
 import { soundManager } from '../audio/soundManager';
+import { getStoredApiKey, setStoredApiKey, testAiConnection } from '../services/aiGenerator';
+import { clearContentHistory, getContentHistoryCount } from '../services/contentHistory';
 
 export function GlobalSettingsPage() {
   const { navigate } = useRouter();
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [isSaved, setIsSaved] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
+  const [geminiKeyInput, setGeminiKeyInput] = useState<string>('');
+  const [isTestingAi, setIsTestingAi] = useState<boolean>(false);
+  const [historyCount, setHistoryCount] = useState<number>(0);
 
   useEffect(() => {
     loadSettings().then((s) => {
       if (s) setSettings(s);
     });
+    setGeminiKeyInput(getStoredApiKey());
+    getContentHistoryCount().then(setHistoryCount);
   }, []);
+
+  const handleSaveGeminiKey = () => {
+    setStoredApiKey(geminiKeyInput);
+    setNotification(geminiKeyInput.trim() ? 'Gemini API key saved!' : 'Gemini API key cleared.');
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handleTestAi = async () => {
+    setIsTestingAi(true);
+    const res = await testAiConnection(geminiKeyInput);
+    setIsTestingAi(false);
+    setNotification(res.message);
+    setTimeout(() => setNotification(null), 4000);
+  };
+
+  const handleClearHistoryAll = async () => {
+    if (confirm('Clear content history across all Hub party games? (Family Feud remains untouched)')) {
+      const deleted = await clearContentHistory();
+      setHistoryCount(0);
+      setNotification(`Cleared ${deleted} content history records.`);
+      setTimeout(() => setNotification(null), 3000);
+    }
+  };
 
   const handleChange = (key: keyof AppSettings, val: any) => {
     const updated = { ...settings, [key]: val };
@@ -252,6 +282,86 @@ export function GlobalSettingsPage() {
                 <option value="4:3">4:3 Standard (Classroom Projector)</option>
                 <option value="auto">Auto Fit Viewport</option>
               </select>
+            </div>
+          </div>
+
+          {/* DYNAMIC CONTENT GENERATION & AI ENGINE */}
+          <div className="p-5 sm:p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <Sparkles className="w-5 h-5 text-amber-400" />
+                <div>
+                  <h2 className="font-display font-black text-lg text-white">Dynamic Content Generation & AI Engine</h2>
+                  <p className="text-xs text-slate-400">Offline procedural generation and optional Google Gemini AI connection.</p>
+                </div>
+              </div>
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
+                Offline Procedural Engine Active
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              The 5 party games (<strong>Family Trivia</strong>, <strong>Charades</strong>, <strong>Pictionary</strong>, <strong>Family Bingo</strong>, and <strong>Guess the Word</strong>) use a comprehensive local procedural generation engine that creates thousands of playable prompts and questions with <strong>zero internet or API key required</strong>.
+            </p>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Optionally, enter a <strong>Google Gemini API key</strong> below to enable AI-powered custom themes and custom prompts on demand. Your key is stored solely in your local browser and is never committed to source code.
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center gap-3 pt-1">
+              <div className="relative w-full sm:flex-1">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <Key className="w-4 h-4" />
+                </div>
+                <input
+                  type="password"
+                  placeholder="Enter Google Gemini API Key (e.g. AIzaSy...)"
+                  value={geminiKeyInput}
+                  onChange={(e) => setGeminiKeyInput(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  onClick={handleSaveGeminiKey}
+                  className="flex-1 sm:flex-initial bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-4 py-2 rounded-xl transition-colors shadow"
+                >
+                  Save Key
+                </button>
+
+                <button
+                  onClick={handleTestAi}
+                  disabled={isTestingAi}
+                  className="flex-1 sm:flex-initial bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs px-4 py-2 rounded-xl transition-colors"
+                >
+                  {isTestingAi ? 'Testing...' : 'Test Connection'}
+                </button>
+              </div>
+            </div>
+
+            {/* Content History Management */}
+            <div className="pt-3 border-t border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-bold text-white flex items-center gap-2">
+                  <span>Content History Tracking</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-950 text-blue-300 border border-blue-800">
+                    {historyCount} items recorded
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Previously played questions and prompts are recorded locally to avoid repetitive questions.
+                </p>
+              </div>
+
+              {historyCount > 0 && (
+                <button
+                  onClick={handleClearHistoryAll}
+                  className="text-xs text-rose-300 hover:text-rose-200 bg-rose-950/60 border border-rose-800/80 px-3 py-1.5 rounded-xl transition-colors"
+                >
+                  Clear History
+                </button>
+              )}
             </div>
           </div>
 

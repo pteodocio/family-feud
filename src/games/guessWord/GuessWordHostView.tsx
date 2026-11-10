@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Trophy } from 'lucide-react';
-import { WORD_CLUES, WORD_CLUE_CATEGORIES } from '../../data/hubData/wordClues';
+import { Trophy, Sparkles } from 'lucide-react';
+import { WORD_CLUES, WORD_CLUE_CATEGORIES, type WordCluePuzzle } from '../../data/hubData/wordClues';
 import { SharedTimer } from '../../components/shared/SharedTimer';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
 import { WinnerPodiumModal } from '../../components/shared/WinnerPodiumModal';
 import { hubSyncBus } from '../../sync/hubSync';
 import { soundManager } from '../../audio/soundManager';
+import { recordContentUsage } from '../../services/contentHistory';
+import { regenerateSingleGuessWordItem } from '../../services/contentEngine';
 
 interface GuessWordHostViewProps {
   teams: ScoreboardParticipant[];
@@ -24,19 +26,30 @@ export function GuessWordHostView({ teams: initialTeams, onEndGame, onReturnToHu
           { id: 't2', name: 'Team Bravo', score: 0, color: 'red' },
         ]
   );
+  const [puzzles, setPuzzles] = useState<WordCluePuzzle[]>(() => {
+    try {
+      const raw = sessionStorage.getItem('hub_custom_content_guess-the-word');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return WORD_CLUES;
+  });
   const [puzzleIndex, setPuzzleIndex] = useState(0);
   const [revealedClueCount, setRevealedClueCount] = useState(1);
   const [isWordRevealed, setIsWordRevealed] = useState(false);
   const [timerRunning, setTimerRunning] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [isGameFinished, setIsGameFinished] = useState(false);
+  const [isGeneratingNext, setIsGeneratingNext] = useState(false);
 
   const filteredPuzzles =
     selectedCategory === 'All'
-      ? WORD_CLUES
-      : WORD_CLUES.filter((p) => p.category === selectedCategory);
+      ? puzzles
+      : puzzles.filter((p) => p.category === selectedCategory);
 
-  const currentPuzzle = filteredPuzzles[puzzleIndex % filteredPuzzles.length];
+  const currentPuzzle = filteredPuzzles[puzzleIndex % Math.max(1, filteredPuzzles.length)] || puzzles[0];
   const currentAvailablePoints = CLUE_POINTS[revealedClueCount - 1] || 10;
 
   // Broadcast state to TV whenever state changes or sync is requested
@@ -81,6 +94,32 @@ export function GuessWordHostView({ teams: initialTeams, onEndGame, onReturnToHu
     hubSyncBus.broadcastTimer(0, false);
     soundManager.playPartyCue('correct');
     hubSyncBus.broadcastSound('correct');
+
+    if (currentPuzzle) {
+      recordContentUsage({
+        gameId: 'guess-the-word',
+        itemTitle: currentPuzzle.word,
+        category: currentPuzzle.category,
+      });
+    }
+  };
+
+  const handleGenerateFreshPuzzle = async () => {
+    setIsGeneratingNext(true);
+    try {
+      const fresh = await regenerateSingleGuessWordItem({
+        category: selectedCategory === 'All' ? undefined : selectedCategory,
+      });
+      if (fresh) {
+        setPuzzles((prev) => [...prev, fresh]);
+        setPuzzleIndex(puzzles.length);
+        setIsWordRevealed(false);
+        setRevealedClueCount(1);
+        setTimerRunning(false);
+      }
+    } finally {
+      setIsGeneratingNext(false);
+    }
   };
 
   const handleNextPuzzle = () => {
@@ -129,6 +168,16 @@ export function GuessWordHostView({ teams: initialTeams, onEndGame, onReturnToHu
               </option>
             ))}
           </select>
+
+          <button
+            onClick={handleGenerateFreshPuzzle}
+            disabled={isGeneratingNext}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600/30 hover:bg-purple-600/40 text-purple-300 border border-purple-500/40 text-xs font-bold transition-colors"
+            title="Generate a fresh puzzle right now"
+          >
+            <Sparkles className={`w-3.5 h-3.5 ${isGeneratingNext ? 'animate-spin' : ''}`} />
+            <span>{isGeneratingNext ? 'Generating...' : '+ Generate New'}</span>
+          </button>
 
           <button
             onClick={() => setIsGameFinished(true)}

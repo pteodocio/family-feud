@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Play, CheckCircle2, ArrowRight, Eye, Trophy } from 'lucide-react';
-import { TRIVIA_QUESTIONS, TRIVIA_CATEGORIES } from '../../data/hubData/triviaQuestions';
+import { Play, CheckCircle2, ArrowRight, Eye, Trophy, Sparkles } from 'lucide-react';
+import { TRIVIA_QUESTIONS, TRIVIA_CATEGORIES, type TriviaQuestion } from '../../data/hubData/triviaQuestions';
 import { SharedTimer } from '../../components/shared/SharedTimer';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
 import { WinnerPodiumModal } from '../../components/shared/WinnerPodiumModal';
 import { hubSyncBus } from '../../sync/hubSync';
 import { soundManager } from '../../audio/soundManager';
+import { recordContentUsage } from '../../services/contentHistory';
+import { regenerateSingleTriviaItem } from '../../services/contentEngine';
 
 interface TriviaHostViewProps {
   teams: ScoreboardParticipant[];
@@ -22,18 +24,29 @@ export function TriviaHostView({ teams: initialTeams, onEndGame, onReturnToHub }
           { id: 't2', name: 'Team Bravo', score: 0, color: 'red' },
         ]
   );
+  const [questions, setQuestions] = useState<TriviaQuestion[]>(() => {
+    try {
+      const raw = sessionStorage.getItem('hub_custom_content_family-trivia');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return TRIVIA_QUESTIONS;
+  });
   const [questionIndex, setQuestionIndex] = useState(0);
   const [isAnswerRevealed, setIsAnswerRevealed] = useState(false);
   const [timerRunning, setTimerRunning] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [isGameFinished, setIsGameFinished] = useState(false);
+  const [isGeneratingNext, setIsGeneratingNext] = useState(false);
 
   const filteredQuestions =
     selectedCategory === 'All'
-      ? TRIVIA_QUESTIONS
-      : TRIVIA_QUESTIONS.filter((q) => q.category === selectedCategory);
+      ? questions
+      : questions.filter((q) => q.category === selectedCategory);
 
-  const currentQ = filteredQuestions[questionIndex % filteredQuestions.length];
+  const currentQ = filteredQuestions[questionIndex % Math.max(1, filteredQuestions.length)] || questions[0];
 
   // Broadcast state to TV display whenever state changes or sync is requested
   const broadcastCurrentState = () => {
@@ -68,6 +81,14 @@ export function TriviaHostView({ teams: initialTeams, onEndGame, onReturnToHub }
     hubSyncBus.broadcastTimer(0, false);
     soundManager.playPartyCue('correct');
     hubSyncBus.broadcastSound('correct');
+
+    if (currentQ) {
+      recordContentUsage({
+        gameId: 'family-trivia',
+        itemTitle: currentQ.prompt,
+        category: currentQ.category,
+      });
+    }
   };
 
   const handleNextQuestion = () => {
@@ -75,6 +96,23 @@ export function TriviaHostView({ teams: initialTeams, onEndGame, onReturnToHub }
     setTimerRunning(false);
     hubSyncBus.broadcastTimer(20, false);
     setQuestionIndex((prev) => prev + 1);
+  };
+
+  const handleGenerateFreshQuestion = async () => {
+    setIsGeneratingNext(true);
+    try {
+      const fresh = await regenerateSingleTriviaItem({
+        category: selectedCategory === 'All' ? undefined : selectedCategory,
+      });
+      if (fresh) {
+        setQuestions((prev) => [...prev, fresh]);
+        setQuestionIndex(questions.length);
+        setIsAnswerRevealed(false);
+        setTimerRunning(false);
+      }
+    } finally {
+      setIsGeneratingNext(false);
+    }
   };
 
   const handleAwardPoints = (teamId: string, pts: number = 20) => {
@@ -122,6 +160,16 @@ export function TriviaHostView({ teams: initialTeams, onEndGame, onReturnToHub }
               </option>
             ))}
           </select>
+
+          <button
+            onClick={handleGenerateFreshQuestion}
+            disabled={isGeneratingNext}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600/30 hover:bg-blue-600/40 text-blue-300 border border-blue-500/40 text-xs font-bold transition-colors"
+            title="Generate a fresh question right now"
+          >
+            <Sparkles className={`w-3.5 h-3.5 ${isGeneratingNext ? 'animate-spin' : ''}`} />
+            <span>{isGeneratingNext ? 'Generating...' : '+ Generate New'}</span>
+          </button>
 
           <button
             onClick={() => setIsGameFinished(true)}

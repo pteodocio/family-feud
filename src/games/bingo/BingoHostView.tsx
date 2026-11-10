@@ -10,6 +10,7 @@ import {
 import { WinnerPodiumModal } from '../../components/shared/WinnerPodiumModal';
 import { hubSyncBus } from '../../sync/hubSync';
 import { soundManager } from '../../audio/soundManager';
+import { recordContentUsage } from '../../services/contentHistory';
 import type { ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
 
 interface BingoHostViewProps {
@@ -27,8 +28,37 @@ export function BingoHostView({ teams, onEndGame, onReturnToHub }: BingoHostView
   const [winnerName, setWinnerName] = useState<string | null>(null);
   const [isGameFinished, setIsGameFinished] = useState(false);
 
-  // Initialize cards for participants
+  // Initialize cards for participants (support dynamically generated cards)
   useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('hub_custom_content_family-bingo');
+      if (raw) {
+        const customCards = JSON.parse(raw);
+        if (Array.isArray(customCards) && customCards.length > 0) {
+          const mappedCards: BingoCard[] = customCards.map((c, i) => {
+            const grid = c.grid.map((row: any[], r: number) =>
+              row.map((cell: any, col: number) => {
+                if (cell.isFree || (r === 2 && col === 2)) return 0;
+                const parsed = parseInt(cell.text, 10);
+                return isNaN(parsed) ? (col * 15 + (r + 1)) : parsed;
+              })
+            );
+            const marked = c.grid.map((row: any[], r: number) =>
+              row.map((cell: any, col: number) => (cell.isFree || (r === 2 && col === 2) ? true : false))
+            );
+            return {
+              id: c.id || `card_${i}`,
+              playerName: c.playerName || (teams[i]?.name ? teams[i].name : `Player ${i + 1}`),
+              grid,
+              marked,
+            };
+          });
+          setPlayerCards(mappedCards);
+          return;
+        }
+      }
+    } catch {}
+
     const names = teams.length > 0 ? teams.map((t) => t.name) : ['Player 1', 'Player 2', 'Player 3'];
     const cards = names.map((name, i) => generateBingoCard(`card_${i}`, name));
     setPlayerCards(cards);
@@ -91,6 +121,11 @@ export function BingoHostView({ teams, onEndGame, onReturnToHub }: BingoHostView
       hubSyncBus.broadcastSound('bingoWin');
       setWinnerName(card.playerName);
       setIsGameFinished(true);
+      recordContentUsage({
+        gameId: 'family-bingo',
+        itemTitle: `Bingo Win - ${card.playerName}`,
+        category: selectedPatternId,
+      });
     } else {
       soundManager.playPartyCue('wrong');
       alert(`${card.playerName}'s card does not have the winning pattern yet!`);

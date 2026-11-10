@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Shuffle, CheckCircle2 } from 'lucide-react';
+import { Shuffle, CheckCircle2, Sparkles } from 'lucide-react';
 import { PICTIONARY_WORDS, PICTIONARY_CATEGORIES, type PictionaryWord } from '../../data/hubData/pictionaryWords';
 import { DrawingCanvas, type DrawingCanvasHandle } from '../../components/shared/DrawingCanvas';
 import { SharedTimer } from '../../components/shared/SharedTimer';
@@ -7,6 +7,8 @@ import { SharedScoreboard, type ScoreboardParticipant } from '../../components/s
 import { WinnerPodiumModal } from '../../components/shared/WinnerPodiumModal';
 import { hubSyncBus } from '../../sync/hubSync';
 import { soundManager } from '../../audio/soundManager';
+import { recordContentUsage } from '../../services/contentHistory';
+import { regenerateSinglePictionaryItem } from '../../services/contentEngine';
 
 interface PictionaryHostViewProps {
   teams: ScoreboardParticipant[];
@@ -23,12 +25,32 @@ export function PictionaryHostView({ teams: initialTeams, onEndGame, onReturnToH
           { id: 't2', name: 'Team Bravo', score: 0, color: 'red' },
         ]
   );
+  const [words, setWords] = useState<PictionaryWord[]>(() => {
+    try {
+      const raw = sessionStorage.getItem('hub_custom_content_pictionary');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return PICTIONARY_WORDS;
+  });
   const [activeTeamIndex, setActiveTeamIndex] = useState(0);
-  const [currentWord, setCurrentWord] = useState<PictionaryWord>(PICTIONARY_WORDS[0]);
+  const [currentWord, setCurrentWord] = useState<PictionaryWord>(() => {
+    try {
+      const raw = sessionStorage.getItem('hub_custom_content_pictionary');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed[0];
+      }
+    } catch {}
+    return PICTIONARY_WORDS[0];
+  });
   const [isWordRevealedOnTv, setIsWordRevealedOnTv] = useState(false);
   const [timerRunning, setTimerRunning] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [isGameFinished, setIsGameFinished] = useState(false);
+  const [isGeneratingNext, setIsGeneratingNext] = useState(false);
   const canvasRef = useRef<DrawingCanvasHandle | null>(null);
 
   const activeTeam = teams[activeTeamIndex % teams.length];
@@ -36,11 +58,11 @@ export function PictionaryHostView({ teams: initialTeams, onEndGame, onReturnToH
   const strokesHistoryRef = useRef<any[]>([]);
 
   const pickRandomWord = () => {
-    let pool = PICTIONARY_WORDS;
+    let pool = words;
     if (selectedCategory !== 'All') {
       pool = pool.filter((w) => w.category === selectedCategory);
     }
-    if (pool.length === 0) pool = PICTIONARY_WORDS;
+    if (pool.length === 0) pool = words;
 
     const chosen = pool[Math.floor(Math.random() * pool.length)];
     setCurrentWord(chosen);
@@ -50,6 +72,27 @@ export function PictionaryHostView({ teams: initialTeams, onEndGame, onReturnToH
     canvasRef.current?.clear();
     hubSyncBus.broadcastCanvasClear();
     hubSyncBus.broadcastTimer(60, false);
+  };
+
+  const handleGenerateFreshWord = async () => {
+    setIsGeneratingNext(true);
+    try {
+      const fresh = await regenerateSinglePictionaryItem({
+        category: selectedCategory === 'All' ? undefined : selectedCategory,
+      });
+      if (fresh) {
+        setWords((prev) => [...prev, fresh]);
+        setCurrentWord(fresh);
+        setIsWordRevealedOnTv(false);
+        setTimerRunning(false);
+        strokesHistoryRef.current = [];
+        canvasRef.current?.clear();
+        hubSyncBus.broadcastCanvasClear();
+        hubSyncBus.broadcastTimer(60, false);
+      }
+    } finally {
+      setIsGeneratingNext(false);
+    }
   };
 
   const broadcastCurrentState = () => {
@@ -88,6 +131,14 @@ export function PictionaryHostView({ teams: initialTeams, onEndGame, onReturnToH
     hubSyncBus.broadcastTimer(0, false);
     soundManager.playPartyCue('correct');
     hubSyncBus.broadcastSound('correct');
+
+    if (currentWord) {
+      recordContentUsage({
+        gameId: 'pictionary',
+        itemTitle: currentWord.word,
+        category: currentWord.category,
+      });
+    }
   };
 
   const handleNextTurn = () => {
@@ -134,7 +185,17 @@ export function PictionaryHostView({ teams: initialTeams, onEndGame, onReturnToH
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors"
           >
             <Shuffle className="w-3.5 h-3.5" />
-            New Word
+            Pick from Pool
+          </button>
+
+          <button
+            onClick={handleGenerateFreshWord}
+            disabled={isGeneratingNext}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition-colors"
+            title="Generate a fresh drawing prompt on the fly"
+          >
+            <Sparkles className={`w-3.5 h-3.5 ${isGeneratingNext ? 'animate-spin' : ''}`} />
+            <span>{isGeneratingNext ? 'Generating...' : '+ Generate New'}</span>
           </button>
 
           <button

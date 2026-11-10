@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   ArrowLeft,
   Volume2,
@@ -17,10 +17,14 @@ import {
   RefreshCw,
   CheckCircle,
   AlertCircle,
+  Sparkles,
+  Key,
 } from 'lucide-react';
 import { useRouter } from '../router/Router';
 import { useGameStore } from '../store/gameStore';
 import { exportUserData, importUserData, initializeDatabase } from '../db/database';
+import { getStoredApiKey, setStoredApiKey, testAiConnection } from '../services/aiGenerator';
+import { clearContentHistory, getContentHistoryCount } from '../services/contentHistory';
 
 export function SettingsPage() {
   const { navigate } = useRouter();
@@ -28,11 +32,39 @@ export function SettingsPage() {
 
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [activePreviewBgm, setActivePreviewBgm] = useState<string | null>(null);
+  const [geminiKeyInput, setGeminiKeyInput] = useState<string>('');
+  const [isTestingAi, setIsTestingAi] = useState<boolean>(false);
+  const [historyCount, setHistoryCount] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setGeminiKeyInput(getStoredApiKey());
+    getContentHistoryCount().then(setHistoryCount);
+  }, []);
 
   const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3500);
+  };
+
+  const handleSaveGeminiKey = () => {
+    setStoredApiKey(geminiKeyInput);
+    showNotification(geminiKeyInput.trim() ? 'Gemini API key saved!' : 'Gemini API key cleared.');
+  };
+
+  const handleTestAi = async () => {
+    setIsTestingAi(true);
+    const res = await testAiConnection(geminiKeyInput);
+    setIsTestingAi(false);
+    showNotification(res.message, res.success ? 'success' : 'error');
+  };
+
+  const handleClearHistoryAll = async () => {
+    if (confirm('Clear content history across all Hub party games? (Family Feud remains untouched)')) {
+      const deleted = await clearContentHistory();
+      setHistoryCount(0);
+      showNotification(`Cleared ${deleted} content history records.`);
+    }
   };
 
   const handleExportBackup = async () => {
@@ -420,6 +452,85 @@ export function SettingsPage() {
           <p className="text-[11px] text-gray-400 italic">
             * Note: Shortcuts are automatically suppressed when typing inside an input box or search field.
           </p>
+        </div>
+
+        {/* DYNAMIC CONTENT GENERATION & AI CONFIGURATION */}
+        <div className="bg-[#071638] border border-blue-900 rounded-2xl p-5 shadow-md flex flex-col gap-4">
+          <div className="flex items-center justify-between border-b border-blue-900/80 pb-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-amber-400" />
+              <h2 className="font-display font-black text-lg text-white">
+                Dynamic Content Generation & AI Engine
+              </h2>
+            </div>
+            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
+              Offline Procedural Engine Active
+            </span>
+          </div>
+
+          <p className="text-xs text-gray-300 leading-relaxed">
+            The 5 party games (<strong>Family Trivia</strong>, <strong>Charades</strong>, <strong>Pictionary</strong>, <strong>Family Bingo</strong>, and <strong>Guess the Word</strong>) use a comprehensive local procedural generation engine that creates thousands of playable prompts and questions with <strong>zero internet or API key required</strong>.
+          </p>
+
+          <p className="text-xs text-gray-300 leading-relaxed">
+            Optionally, you can enter a <strong>Google Gemini API key</strong> below to enable AI-powered custom themes and custom prompts on demand. Your key is stored solely in your local browser and is never committed to source code.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center gap-3 pt-1">
+            <div className="relative w-full sm:flex-1">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <Key className="w-4 h-4" />
+              </div>
+              <input
+                type="password"
+                placeholder="Enter Google Gemini API Key (e.g. AIzaSy...)"
+                value={geminiKeyInput}
+                onChange={(e) => setGeminiKeyInput(e.target.value)}
+                className="w-full bg-[#0a1b42] border border-blue-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                onClick={handleSaveGeminiKey}
+                className="flex-1 sm:flex-initial bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-4 py-2 rounded-xl transition-colors shadow"
+              >
+                Save Key
+              </button>
+
+              <button
+                onClick={handleTestAi}
+                disabled={isTestingAi}
+                className="flex-1 sm:flex-initial bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs px-4 py-2 rounded-xl transition-colors"
+              >
+                {isTestingAi ? 'Testing...' : 'Test Connection'}
+              </button>
+            </div>
+          </div>
+
+          {/* Content History Management */}
+          <div className="mt-2 pt-3 border-t border-blue-900/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <div className="text-xs font-bold text-white flex items-center gap-2">
+                <span>Content History Tracking</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-950 text-blue-300 border border-blue-800">
+                  {historyCount} items recorded
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                Previously played questions and prompts are recorded locally to avoid repetitive questions.
+              </p>
+            </div>
+
+            {historyCount > 0 && (
+              <button
+                onClick={handleClearHistoryAll}
+                className="text-xs text-rose-300 hover:text-rose-200 bg-rose-950/60 border border-rose-800/80 px-3 py-1.5 rounded-xl transition-colors"
+              >
+                Clear History
+              </button>
+            )}
+          </div>
         </div>
 
         {/* LOCAL STORAGE & BACKUP */}

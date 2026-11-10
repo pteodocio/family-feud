@@ -17,7 +17,18 @@ export interface AppSettings {
   keyboardShortcutsEnabled: boolean;
   highContrastMode: boolean;
   tvAspectRatio: '16:9' | '4:3' | 'auto';
+  geminiApiKey?: string;
   defaultConfig: GameConfig;
+}
+
+export interface HubContentHistoryEntry {
+  id: string; // `${gameId}_${itemHash}`
+  gameId: string;
+  itemHash: string;
+  itemTitle: string;
+  category: string;
+  difficulty?: string;
+  usedAt: string; // ISO date string
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -52,6 +63,7 @@ export class FeudDatabase extends Dexie {
   players!: Table<HubPlayer, string>;
   teams!: Table<HubTeam, string>;
   gameHistory!: Table<HubGameHistoryEntry, string>;
+  contentHistory!: Table<HubContentHistoryEntry, string>;
 
   constructor() {
     super('FamilyFeudGameShowDB');
@@ -67,6 +79,10 @@ export class FeudDatabase extends Dexie {
       players: 'id, name, teamId, createdAt',
       teams: 'id, name, color, score',
       gameHistory: 'id, gameId, gameTitle, datePlayed, winnerName',
+    });
+
+    this.version(3).stores({
+      contentHistory: 'id, gameId, itemHash, usedAt, category',
     });
   }
 }

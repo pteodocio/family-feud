@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Play, Shuffle, Eye, CheckCircle2 } from 'lucide-react';
+import { Play, Shuffle, Eye, CheckCircle2, Sparkles } from 'lucide-react';
 import { CHARADES_WORDS, CHARADES_CATEGORIES, type CharadesWord } from '../../data/hubData/charadesWords';
 import { SharedTimer } from '../../components/shared/SharedTimer';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
 import { WinnerPodiumModal } from '../../components/shared/WinnerPodiumModal';
 import { hubSyncBus } from '../../sync/hubSync';
 import { soundManager } from '../../audio/soundManager';
+import { recordContentUsage } from '../../services/contentHistory';
+import { regenerateSingleCharadesItem } from '../../services/contentEngine';
 
 interface CharadesHostViewProps {
   teams: ScoreboardParticipant[];
@@ -22,31 +24,69 @@ export function CharadesHostView({ teams: initialTeams, onEndGame, onReturnToHub
           { id: 't2', name: 'Team Bravo', score: 0, color: 'red' },
         ]
   );
+  const [words, setWords] = useState<CharadesWord[]>(() => {
+    try {
+      const raw = sessionStorage.getItem('hub_custom_content_charades');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return CHARADES_WORDS;
+  });
   const [activeTeamIndex, setActiveTeamIndex] = useState(0);
-  const [currentWord, setCurrentWord] = useState<CharadesWord>(CHARADES_WORDS[0]);
+  const [currentWord, setCurrentWord] = useState<CharadesWord>(() => {
+    try {
+      const raw = sessionStorage.getItem('hub_custom_content_charades');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed[0];
+      }
+    } catch {}
+    return CHARADES_WORDS[0];
+  });
   const [isWordRevealedOnTv, setIsWordRevealedOnTv] = useState(false);
   const [timerRunning, setTimerRunning] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedDifficulty, setSelectedDifficulty] = useState<'all' | 'easy' | 'medium' | 'hard'>('all');
   const [isGameFinished, setIsGameFinished] = useState(false);
+  const [isGeneratingNext, setIsGeneratingNext] = useState(false);
 
   const activeTeam = teams[activeTeamIndex % teams.length];
 
   // Pick random word based on filters
   const pickRandomWord = () => {
-    let pool = CHARADES_WORDS;
+    let pool = words;
     if (selectedCategory !== 'All') {
       pool = pool.filter((w) => w.category === selectedCategory);
     }
     if (selectedDifficulty !== 'all') {
       pool = pool.filter((w) => w.difficulty === selectedDifficulty);
     }
-    if (pool.length === 0) pool = CHARADES_WORDS;
+    if (pool.length === 0) pool = words;
 
     const chosen = pool[Math.floor(Math.random() * pool.length)];
     setCurrentWord(chosen);
     setIsWordRevealedOnTv(false);
     setTimerRunning(false);
+  };
+
+  const handleGenerateFreshWord = async () => {
+    setIsGeneratingNext(true);
+    try {
+      const fresh = await regenerateSingleCharadesItem({
+        category: selectedCategory === 'All' ? undefined : selectedCategory,
+        difficulty: selectedDifficulty,
+      });
+      if (fresh) {
+        setWords((prev) => [...prev, fresh]);
+        setCurrentWord(fresh);
+        setIsWordRevealedOnTv(false);
+        setTimerRunning(false);
+      }
+    } finally {
+      setIsGeneratingNext(false);
+    }
   };
 
   // Broadcast state to TV Display whenever state changes or sync is requested
@@ -85,6 +125,15 @@ export function CharadesHostView({ teams: initialTeams, onEndGame, onReturnToHub
     hubSyncBus.broadcastTimer(0, false);
     soundManager.playPartyCue('correct');
     hubSyncBus.broadcastSound('correct');
+
+    if (currentWord) {
+      recordContentUsage({
+        gameId: 'charades',
+        itemTitle: currentWord.word,
+        category: currentWord.category,
+        difficulty: currentWord.difficulty,
+      });
+    }
   };
 
   const handleNextTurn = () => {
@@ -145,7 +194,17 @@ export function CharadesHostView({ teams: initialTeams, onEndGame, onReturnToHub
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors"
           >
             <Shuffle className="w-3.5 h-3.5" />
-            New Word
+            Pick from Pool
+          </button>
+
+          <button
+            onClick={handleGenerateFreshWord}
+            disabled={isGeneratingNext}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600/30 hover:bg-rose-600/40 text-rose-300 border border-rose-500/40 text-xs font-bold transition-colors"
+            title="Generate a fresh prompt on the fly"
+          >
+            <Sparkles className={`w-3.5 h-3.5 ${isGeneratingNext ? 'animate-spin' : ''}`} />
+            <span>{isGeneratingNext ? 'Generating...' : '+ Generate New'}</span>
           </button>
 
           <button
