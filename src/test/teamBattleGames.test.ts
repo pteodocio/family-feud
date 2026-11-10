@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GAMES_CATALOG, getGameById } from '../games/registry';
+import { getGameById } from '../games/registry';
 import {
   generatePasswordContent,
   generateCatchphraseContent,
@@ -102,7 +102,7 @@ describe('Team Battle Games - Comprehensive Integration Suite', () => {
     });
 
     it('generates complete Jeopardy boards (5 categories x 5 clues = 25 clues)', async () => {
-      const board = await generateJeopardyContent({ language: 'en' });
+      const board = await generateJeopardyContent();
       expect(board.categories).toHaveLength(5);
       board.categories.forEach((cat) => {
         expect(cat.questions).toHaveLength(5);
@@ -112,7 +112,7 @@ describe('Team Battle Games - Comprehensive Integration Suite', () => {
     });
 
     it('generates Wheel of Fortune puzzles with valid categories', async () => {
-      const res = await generateWheelContent({ count: 4, language: 'fil' });
+      const res = await generateWheelContent({ count: 4 });
       expect(res.puzzles.length).toBeGreaterThanOrEqual(1);
       res.puzzles.forEach((p) => {
         expect(p.phrase.length).toBeGreaterThan(3);
@@ -121,7 +121,7 @@ describe('Team Battle Games - Comprehensive Integration Suite', () => {
     });
 
     it('generates Bluff the Answer questions with true answers', async () => {
-      const res = await generateBluffContent({ count: 5, language: 'fil' });
+      const res = await generateBluffContent({ count: 5 });
       expect(res.items.length).toBeGreaterThanOrEqual(1);
       res.items.forEach((q) => {
         expect(q.question).toBeTruthy();
@@ -130,7 +130,7 @@ describe('Team Battle Games - Comprehensive Integration Suite', () => {
     });
 
     it('generates Heads Up clue decks with varied items', async () => {
-      const res = await generateHeadsUpContent({ count: 10, language: 'en' });
+      const res = await generateHeadsUpContent({ count: 10 });
       expect(res.cards.length).toBeGreaterThanOrEqual(1);
       res.cards.forEach((item) => {
         expect(item.item).toBeTruthy();
@@ -139,7 +139,7 @@ describe('Team Battle Games - Comprehensive Integration Suite', () => {
     });
 
     it('generates 4x4 Word Hunt letter grids with path validator', async () => {
-      const gridData = await generateWordHuntContent({ language: 'fil' });
+      const gridData = await generateWordHuntContent();
       expect(gridData.grid).toHaveLength(4);
       gridData.grid.forEach((row) => {
         expect(row).toHaveLength(4);
@@ -148,13 +148,13 @@ describe('Team Battle Games - Comprehensive Integration Suite', () => {
     });
 
     it('generates Scattergories letter roll and categories', async () => {
-      const round = await generateScattergoriesContent({ language: 'en' });
+      const round = await generateScattergoriesContent();
       expect(round.letter).toMatch(/^[A-Z]$/);
       expect(round.categories.length).toBeGreaterThanOrEqual(6);
     });
 
     it('generates Trivia Elimination survival questions with explanations', async () => {
-      const res = await generateEliminationContent({ count: 8, language: 'fil' });
+      const res = await generateEliminationContent({ count: 8 });
       expect(res.questions.length).toBeGreaterThanOrEqual(1);
       res.questions.forEach((q) => {
         expect(q.question).toBeTruthy();

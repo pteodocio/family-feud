@@ -1,20 +1,39 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Family Game Hub End-to-End Tests', () => {
-  test('Homepage loads with branding, hero section, and 6 game cards', async ({ page }) => {
+  test('Homepage loads with branding, hero section, and game cards', async ({ page }) => {
     await page.goto('/');
 
     // Check Branding
     await expect(page.getByRole('heading', { name: 'Family Game Hub' }).first()).toBeVisible();
     await expect(page.getByText('One Place. Endless Family Fun.').first()).toBeVisible();
 
-    // Check All 6 Games are present in Library
+    // Check Core Games are present in Library
     await expect(page.getByRole('heading', { name: 'Family Feud', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Family Trivia', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Charades Party', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Pictionary', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Family Bingo', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Guess the Word', exact: true })).toBeVisible();
+
+    // Check Team Battle Games are present
+    await expect(page.getByRole('heading', { name: 'Password', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Jeopardy!', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Wheel of Fortune', exact: true })).toBeVisible();
+  });
+
+  test('Filters game library by Team Battle Games category', async ({ page }) => {
+    await page.goto('/');
+
+    // Click on Team Battle Games tab
+    const teamBattleTab = page.getByRole('button', { name: /Team Battle Games/i }).first();
+    await expect(teamBattleTab).toBeVisible();
+    await teamBattleTab.click();
+
+    // Password, Taboo, Catchphrase should be visible
+    await expect(page.getByRole('heading', { name: 'Password', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Taboo', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Catchphrase', exact: true })).toBeVisible();
   });
 
   test('How to Play modal opens and displays rules', async ({ page }) => {
@@ -207,5 +226,61 @@ test.describe('Family Game Hub End-to-End Tests', () => {
     await expect(page.getByRole('heading', { name: 'Living Room Hall of Fame Badges' })).toBeVisible();
     await expect(page.getByText('Feud Legend')).toBeVisible();
     await expect(page.getByText('Trivia Wizard')).toBeVisible();
+  });
+
+  test('Launches Password into Host Console with point ladder and secret word', async ({ page }) => {
+    await page.goto('/#/games/password/setup');
+
+    await expect(page.getByRole('heading', { name: 'Password' })).toBeVisible();
+    await page.getByRole('button', { name: /Start Game Console/i }).click();
+
+    await expect(page.getByText('Password Console').first()).toBeVisible();
+    await expect(page.getByText(/Secret Password/i).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Correct!/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Pass \/ Wrong/i })).toBeVisible();
+  });
+
+  test('Launches Jeopardy! into Host Console with interactive 5x5 board', async ({ page }) => {
+    await page.goto('/#/games/jeopardy/setup');
+
+    await expect(page.getByRole('heading', { name: 'Jeopardy!' })).toBeVisible();
+    await page.getByRole('button', { name: /Start Game Console/i }).click();
+
+    await expect(page.getByText('Jeopardy! Host Console').first()).toBeVisible();
+    // Grid contains $100 and $500 buttons
+    await expect(page.getByRole('button', { name: '$100' }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: '$500' }).first()).toBeVisible();
+  });
+
+  test('Launches Wheel of Fortune into Host Console with spin wheel and phrase tiles', async ({ page }) => {
+    await page.goto('/#/games/wheel-of-fortune/setup');
+
+    await expect(page.getByRole('heading', { name: 'Wheel of Fortune' })).toBeVisible();
+    await page.getByRole('button', { name: /Start Game Console/i }).click();
+
+    await expect(page.getByText('Wheel of Fortune Console').first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Spin The Wheel/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Solve Verified/i })).toBeVisible();
+  });
+
+  test('Launches Heads Up into Host Console with deck and pass/correct counters', async ({ page }) => {
+    await page.goto('/#/games/heads-up/setup');
+
+    await expect(page.getByRole('heading', { name: 'Heads Up!' })).toBeVisible();
+    await page.getByRole('button', { name: /Start Game Console/i }).click();
+
+    await expect(page.getByText('Heads Up! Host Console').first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Correct/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Pass/i }).first()).toBeVisible();
+  });
+
+  test('TV Display mirrors battle game without leaking secret clues', async ({ page }) => {
+    // Password TV view hides secret password until reveal
+    await page.goto('/#/display/hub/password');
+    await expect(page.getByText(/Password: Team Battle|Waiting for Host/i).first()).toBeVisible();
+
+    // Wheel of Fortune TV view shows puzzle board
+    await page.goto('/#/display/hub/wheel-of-fortune');
+    await expect(page.getByText(/Wheel of Fortune TV Board|Waiting for Host/i).first()).toBeVisible();
   });
 });
