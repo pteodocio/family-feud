@@ -58,6 +58,16 @@ export function createNewTournament(
     'pictionary': 'Pictionary',
     'family-bingo': 'Family Bingo',
     'guess-the-word': 'Guess the Word',
+    'password': 'Password',
+    'catchphrase': 'Catchphrase',
+    'taboo': 'Taboo',
+    'jeopardy': 'Jeopardy!',
+    'wheel-of-fortune': 'Wheel of Fortune',
+    'bluff-the-answer': 'Bluff the Answer',
+    'heads-up': 'Heads Up!',
+    'word-hunt': 'Word Hunt',
+    'scattergories': 'Scattergories',
+    'trivia-elimination': 'Trivia Elimination',
   };
 
   const rounds: TournamentRound[] = gameIds.map((id) => ({

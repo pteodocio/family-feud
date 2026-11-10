@@ -47,7 +47,17 @@ export type GameCatalogId =
   | 'charades'
   | 'pictionary'
   | 'family-bingo'
-  | 'guess-the-word';
+  | 'guess-the-word'
+  | 'password'
+  | 'catchphrase'
+  | 'taboo'
+  | 'jeopardy'
+  | 'wheel-of-fortune'
+  | 'bluff-the-answer'
+  | 'heads-up'
+  | 'word-hunt'
+  | 'scattergories'
+  | 'trivia-elimination';
 
 export interface GameCatalogItem {
   id: GameCatalogId;

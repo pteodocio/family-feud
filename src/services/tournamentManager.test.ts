@@ -70,4 +70,25 @@ describe('Tournament Manager Service', () => {
     expect(finished?.isFinished).toBe(true);
     expect(finished?.currentRoundIndex).toBe(1);
   });
+
+  it('supports all 10 new team battle games in tournament playlists', () => {
+    const battleGames = [
+      'password',
+      'catchphrase',
+      'taboo',
+      'jeopardy',
+      'wheel-of-fortune',
+      'bluff-the-answer',
+      'heads-up',
+      'word-hunt',
+      'scattergories',
+      'trivia-elimination',
+    ] as any[];
+
+    const session = createNewTournament('Super Championship', battleGames, ['Dragons', 'Tigers']);
+    expect(session.rounds).toHaveLength(10);
+    expect(session.rounds[0].gameName).toBe('Password');
+    expect(session.rounds[3].gameName).toBe('Jeopardy!');
+    expect(session.rounds[4].gameName).toBe('Wheel of Fortune');
+  });
 });
