@@ -61,6 +61,11 @@ export function GuessWordHostView({ teams: initialTeams, onEndGame, onReturnToHu
       currentPoints: currentAvailablePoints,
       isWordRevealed,
       secretWord: isWordRevealed ? currentPuzzle.word : null,
+      letterCount: currentPuzzle.word.replace(/\s+/g, '').length,
+      wordLetterBlanks: currentPuzzle.word
+        .split('')
+        .map((ch) => (ch === ' ' ? '  ' : '_'))
+        .join(' '),
       teams,
       isGameFinished,
     });

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, CheckCircle2, ArrowRight, Eye, Trophy, Sparkles } from 'lucide-react';
+import { Play, CheckCircle2, ArrowRight, ArrowLeft, Eye, Trophy, Sparkles } from 'lucide-react';
 import { TRIVIA_QUESTIONS, TRIVIA_CATEGORIES, type TriviaQuestion } from '../../data/hubData/triviaQuestions';
 import { SharedTimer } from '../../components/shared/SharedTimer';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
@@ -95,7 +95,16 @@ export function TriviaHostView({ teams: initialTeams, onEndGame, onReturnToHub }
     setIsAnswerRevealed(false);
     setTimerRunning(false);
     hubSyncBus.broadcastTimer(20, false);
-    setQuestionIndex((prev) => prev + 1);
+    setQuestionIndex((prev) => (prev + 1) % filteredQuestions.length);
+  };
+
+  const handlePrevQuestion = () => {
+    if (questionIndex > 0) {
+      setIsAnswerRevealed(false);
+      setTimerRunning(false);
+      hubSyncBus.broadcastTimer(20, false);
+      setQuestionIndex((prev) => prev - 1);
+    }
   };
 
   const handleGenerateFreshQuestion = async () => {
@@ -133,13 +142,33 @@ export function TriviaHostView({ teams: initialTeams, onEndGame, onReturnToHub }
     <div className="flex flex-col gap-5 p-4 sm:p-6 max-w-6xl mx-auto text-slate-100">
       {/* Top Controls & Category Picker */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/80 p-4 rounded-2xl border border-slate-800">
-        <div>
-          <span className="text-xs font-bold uppercase tracking-wider text-sky-400">
-            Family Trivia Host Console
-          </span>
-          <h2 className="text-lg font-bold text-white">
-            Question {questionIndex + 1} of {filteredQuestions.length}
-          </h2>
+        <div className="flex items-center gap-3">
+          <div>
+            <span className="text-xs font-bold uppercase tracking-wider text-sky-400">
+              Family Trivia Host Console
+            </span>
+            <h2 className="text-lg font-bold text-white">
+              Question {questionIndex + 1} of {filteredQuestions.length}
+            </h2>
+          </div>
+
+          {/* Jump to Question Dropdown */}
+          <select
+            value={questionIndex}
+            onChange={(e) => {
+              setQuestionIndex(Number(e.target.value));
+              setIsAnswerRevealed(false);
+              setTimerRunning(false);
+            }}
+            className="bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1 text-xs text-white"
+            title="Jump directly to question"
+          >
+            {filteredQuestions.map((_, idx) => (
+              <option key={idx} value={idx}>
+                Q{idx + 1}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="flex items-center gap-2">
@@ -259,13 +288,26 @@ export function TriviaHostView({ teams: initialTeams, onEndGame, onReturnToHub }
               Reveal Answer on TV
             </button>
 
-            <button
-              onClick={handleNextQuestion}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors ml-auto"
-            >
-              Next Question
-              <ArrowRight className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2 ml-auto">
+              <button
+                onClick={handlePrevQuestion}
+                disabled={questionIndex === 0}
+                className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold transition-colors"
+                title="Previous Question"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Prev
+              </button>
+
+              <button
+                onClick={handleNextQuestion}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-colors shadow-md"
+                title="Next Question"
+              >
+                Next
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
 

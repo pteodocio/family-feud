@@ -152,4 +152,60 @@ test.describe('Family Game Hub End-to-End Tests', () => {
     await page.goto('/#/display/hub/charades');
     await expect(page.getByText(/Charades Party|Guess the Word!|ACTING IN PROGRESS/)).toBeVisible();
   });
+
+  test('Surprise Game Wheel modal opens, spins, and highlights a random game', async ({ page }) => {
+    await page.goto('/');
+
+    const wheelBtn = page.getByRole('button', { name: /Surprise Wheel/i }).first();
+    await wheelBtn.click();
+
+    await expect(page.getByRole('heading', { name: 'Surprise Game Wheel' })).toBeVisible();
+
+    // The wheel spins on launch with 'Spinning...' or 'Spin Again' button
+    await expect(page.getByRole('button', { name: /Spinning\.\.\.|Spin Again/i })).toBeVisible();
+
+    // After spinning completes, game launch button appears
+    await expect(page.locator('.fixed.inset-0').getByRole('button', { name: /Play .* →/i })).toBeVisible({ timeout: 10000 });
+  });
+
+  test('Tournament Mode modal opens, starts tournament, and displays standings', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => localStorage.removeItem('hub_active_tournament'));
+
+    const tournamentBtn = page.getByRole('button', { name: /Tournament Mode/i }).first();
+    await tournamentBtn.click();
+
+    await expect(page.getByRole('heading', { name: /Party Night Tournament Mode/i })).toBeVisible();
+    await expect(page.getByText(/Select Games in Tournament Order/i)).toBeVisible();
+
+    // Start tournament
+    const startBtn = page.getByRole('button', { name: /Start Championship Tournament/i });
+    await expect(startBtn).toBeVisible();
+    await startBtn.click();
+
+    // Verify championship standings are visible
+    await expect(page.getByText('Championship In Progress')).toBeVisible();
+    await expect(page.getByText('Cumulative Tournament Standings')).toBeVisible();
+  });
+
+  test('Player Manager modal allows auto-balancing and turn picking', async ({ page }) => {
+    await page.goto('/');
+
+    const rosterBtn = page.getByRole('button', { name: /Roster/i }).first();
+    await rosterBtn.click();
+
+    await expect(page.getByRole('heading', { name: 'Manage Players & Teams' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Auto-Balance Teams/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Who Goes First/i })).toBeVisible();
+  });
+
+  test('Game History displays Hall of Fame statistics and Achievement Badges', async ({ page }) => {
+    await page.goto('/#/history');
+
+    await expect(page.getByRole('heading', { name: /Game History Ledger/i })).toBeVisible();
+    await expect(page.getByText('Total recorded rounds')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Living Room Hall of Fame Badges' })).toBeVisible();
+    await expect(page.getByText('Feud Legend')).toBeVisible();
+    await expect(page.getByText('Trivia Wizard')).toBeVisible();
+  });
 });

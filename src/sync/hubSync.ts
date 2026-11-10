@@ -17,6 +17,8 @@ export type HubSyncMessage =
   | { type: 'TIMER_UPDATE'; timer: { remaining: number; running: boolean } }
   | { type: 'TRIGGER_SOUND'; cue: PartySoundCue }
   | { type: 'REQUEST_SYNC' }
+  | { type: 'LIVE_ANNOUNCEMENT'; text: string; durationSeconds: number }
+  | { type: 'TV_PULSE'; connected: boolean }
   | { type: 'HEARTBEAT_PING'; timestamp: number }
   | { type: 'HEARTBEAT_PONG'; timestamp: number };
 
@@ -31,6 +33,8 @@ export class HubSyncBus {
   private onTimerCallbacks: Set<(timer: { remaining: number; running: boolean }) => void> = new Set();
   private onSoundCallbacks: Set<(cue: PartySoundCue) => void> = new Set();
   private onRequestSyncCallbacks: Set<() => void> = new Set();
+  private onAnnouncementCallbacks: Set<(announcement: { text: string; durationSeconds: number }) => void> = new Set();
+  private onTvPulseCallbacks: Set<(pulse: { connected: boolean }) => void> = new Set();
 
   constructor(channelName: string = 'family-game-hub-sync-v1') {
     this.channelName = channelName;
@@ -79,6 +83,16 @@ export class HubSyncBus {
 
       case 'TRIGGER_SOUND':
         this.onSoundCallbacks.forEach((cb) => cb(msg.cue));
+        break;
+
+      case 'LIVE_ANNOUNCEMENT':
+        this.onAnnouncementCallbacks.forEach((cb) =>
+          cb({ text: msg.text, durationSeconds: msg.durationSeconds })
+        );
+        break;
+
+      case 'TV_PULSE':
+        this.onTvPulseCallbacks.forEach((cb) => cb({ connected: msg.connected }));
         break;
 
       case 'REQUEST_SYNC':
@@ -222,6 +236,41 @@ export class HubSyncBus {
   public onSoundTrigger(cb: (cue: PartySoundCue) => void): () => void {
     this.onSoundCallbacks.add(cb);
     return () => this.onSoundCallbacks.delete(cb);
+  }
+
+  public broadcastAnnouncement(text: string, durationSeconds: number = 6): void {
+    if (this.channel) {
+      try {
+        this.channel.postMessage({
+          type: 'LIVE_ANNOUNCEMENT',
+          text,
+          durationSeconds,
+        } as HubSyncMessage);
+      } catch {}
+    }
+  }
+
+  public onAnnouncement(
+    cb: (announcement: { text: string; durationSeconds: number }) => void
+  ): () => void {
+    this.onAnnouncementCallbacks.add(cb);
+    return () => this.onAnnouncementCallbacks.delete(cb);
+  }
+
+  public broadcastTvPulse(connected: boolean = true): void {
+    if (this.channel) {
+      try {
+        this.channel.postMessage({
+          type: 'TV_PULSE',
+          connected,
+        } as HubSyncMessage);
+      } catch {}
+    }
+  }
+
+  public onTvPulse(cb: (pulse: { connected: boolean }) => void): () => void {
+    this.onTvPulseCallbacks.add(cb);
+    return () => this.onTvPulseCallbacks.delete(cb);
   }
 
   public onRequestSync(cb: () => void): () => void {

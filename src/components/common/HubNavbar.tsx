@@ -1,14 +1,21 @@
 import { useState } from 'react';
-import { Home, Gamepad2, History, Settings, Users, Volume2, HelpCircle, Menu, X } from 'lucide-react';
+import { Home, Gamepad2, History, Settings, Users, Volume2, HelpCircle, Menu, X, Trophy, Dices } from 'lucide-react';
 import { useRouter } from '../../router/Router';
 import { soundManager } from '../../audio/soundManager';
 
 interface HubNavbarProps {
   onOpenPlayerManager?: () => void;
   onOpenHowToPlay?: () => void;
+  onOpenTournament?: () => void;
+  onOpenSpinner?: () => void;
 }
 
-export function HubNavbar({ onOpenPlayerManager, onOpenHowToPlay }: HubNavbarProps) {
+export function HubNavbar({
+  onOpenPlayerManager,
+  onOpenHowToPlay,
+  onOpenTournament,
+  onOpenSpinner,
+}: HubNavbarProps) {
   const { currentPath, navigate } = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAudioActive, setIsAudioActive] = useState(false);
@@ -86,6 +93,28 @@ export function HubNavbar({ onOpenPlayerManager, onOpenHowToPlay }: HubNavbarPro
 
         {/* Right Action Buttons */}
         <div className="hidden md:flex items-center gap-2.5">
+          {onOpenSpinner && (
+            <button
+              onClick={onOpenSpinner}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/40 hover:bg-purple-500/20 text-xs font-bold text-purple-300 transition-colors shadow-sm"
+              title="Surprise Game Wheel"
+            >
+              <Dices className="w-4 h-4 text-purple-400" />
+              Surprise Wheel
+            </button>
+          )}
+
+          {onOpenTournament && (
+            <button
+              onClick={onOpenTournament}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/40 hover:bg-amber-500/20 text-xs font-bold text-amber-300 transition-colors shadow-sm"
+              title="Tournament Championship Mode"
+            >
+              <Trophy className="w-4 h-4 text-amber-400" />
+              Tournament
+            </button>
+          )}
+
           {onOpenPlayerManager && (
             <button
               onClick={onOpenPlayerManager}
@@ -113,10 +142,21 @@ export function HubNavbar({ onOpenPlayerManager, onOpenHowToPlay }: HubNavbarPro
 
         {/* Mobile Hamburger Button */}
         <div className="flex md:hidden items-center gap-2">
+          {onOpenTournament && (
+            <button
+              onClick={onOpenTournament}
+              className="p-2 rounded-xl bg-slate-800 text-amber-400"
+              title="Tournament"
+            >
+              <Trophy className="w-4 h-4" />
+            </button>
+          )}
+
           {onOpenPlayerManager && (
             <button
               onClick={onOpenPlayerManager}
               className="p-2 rounded-xl bg-slate-800 text-blue-400"
+              title="Roster"
             >
               <Users className="w-4 h-4" />
             </button>
@@ -147,6 +187,32 @@ export function HubNavbar({ onOpenPlayerManager, onOpenHowToPlay }: HubNavbarPro
               {item.label}
             </button>
           ))}
+
+          {onOpenSpinner && (
+            <button
+              onClick={() => {
+                onOpenSpinner();
+                setMobileMenuOpen(false);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-purple-300 hover:bg-slate-800/80"
+            >
+              <Dices className="w-4 h-4 text-purple-400" />
+              Surprise Game Wheel
+            </button>
+          )}
+
+          {onOpenTournament && (
+            <button
+              onClick={() => {
+                onOpenTournament();
+                setMobileMenuOpen(false);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-amber-300 hover:bg-slate-800/80"
+            >
+              <Trophy className="w-4 h-4 text-amber-400" />
+              Tournament Mode
+            </button>
+          )}
 
           {onOpenHowToPlay && (
             <button

@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { Play, Sparkles, Tv, Users, ArrowDown, HelpCircle, X, RotateCcw, Trash2 } from 'lucide-react';
+import { Play, Sparkles, Tv, Users, ArrowDown, HelpCircle, X, RotateCcw, Trash2, Dices, Trophy } from 'lucide-react';
 import { useRouter } from '../router/Router';
 import { HubNavbar } from '../components/common/HubNavbar';
 import { GameCard } from '../components/shared/GameCard';
 import { PlayerManagerModal } from '../components/shared/PlayerManagerModal';
+import { RandomGameSpinnerModal } from '../components/shared/RandomGameSpinnerModal';
+import { TournamentModeModal } from '../components/shared/TournamentModeModal';
 import { GAMES_CATALOG } from '../games/registry';
 import type { GameCatalogItem } from '../types/hub';
 import { listGameSessions, deleteGameSession } from '../db/database';
@@ -13,6 +15,8 @@ export function MainHubPage() {
   const { navigate, openDisplayWindow } = useRouter();
   const [selectedRulesGame, setSelectedRulesGame] = useState<GameCatalogItem | null>(null);
   const [isPlayerManagerOpen, setIsPlayerManagerOpen] = useState(false);
+  const [isSpinnerOpen, setIsSpinnerOpen] = useState(false);
+  const [isTournamentOpen, setIsTournamentOpen] = useState(false);
   const [recentFeudGames, setRecentFeudGames] = useState<GameSession[]>([]);
   const libraryRef = useRef<HTMLDivElement | null>(null);
 
@@ -47,10 +51,12 @@ export function MainHubPage() {
       <HubNavbar
         onOpenPlayerManager={() => setIsPlayerManagerOpen(true)}
         onOpenHowToPlay={() => setSelectedRulesGame(GAMES_CATALOG[0])}
+        onOpenSpinner={() => setIsSpinnerOpen(true)}
+        onOpenTournament={() => setIsTournamentOpen(true)}
       />
 
       {/* HERO SECTION */}
-      <header className="relative pt-12 pb-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full text-center overflow-hidden">
+      <header className="relative pt-10 pb-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full text-center overflow-hidden">
         {/* Ambient atmospheric glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-gradient-to-r from-blue-600/20 via-purple-600/15 to-amber-500/15 blur-[120px] pointer-events-none -z-10" />
 
@@ -75,21 +81,39 @@ export function MainHubPage() {
           </p>
 
           {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 mt-8 max-w-md mx-auto">
+          <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 mt-8 max-w-xl mx-auto">
             <button
               onClick={handleScrollToGames}
-              className="w-full sm:w-auto flex-1 flex items-center justify-center gap-2.5 py-4 px-8 rounded-2xl font-display font-black text-base sm:text-lg bg-gradient-to-r from-amber-400 to-amber-500 hover:brightness-110 text-slate-950 shadow-xl shadow-amber-500/20 transition-transform active:scale-95"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 py-3 px-6 rounded-2xl font-display font-black text-sm sm:text-base bg-gradient-to-r from-amber-400 to-amber-500 hover:brightness-110 text-slate-950 shadow-lg shadow-amber-500/20 transition-transform active:scale-95"
             >
               Explore All Games
-              <ArrowDown className="w-5 h-5 animate-bounce" />
+              <ArrowDown className="w-4 h-4 animate-bounce" />
             </button>
 
             <button
               onClick={() => handlePlayGame('family-feud')}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 py-4 px-6 rounded-2xl font-bold text-sm bg-slate-900/90 hover:bg-slate-800 text-white border border-slate-700 transition-colors"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 py-3 px-5 rounded-2xl font-bold text-xs sm:text-sm bg-slate-900/90 hover:bg-slate-800 text-white border border-slate-700 transition-colors"
             >
               <Play className="w-4 h-4 text-amber-400 fill-current" />
               Quick Play Feud
+            </button>
+
+            <button
+              onClick={() => setIsSpinnerOpen(true)}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 py-3 px-4 rounded-2xl font-bold text-xs sm:text-sm bg-purple-900/60 hover:bg-purple-800/80 text-purple-200 border border-purple-500/40 transition-all active:scale-95"
+              title="Can't decide? Let the wheel pick!"
+            >
+              <Dices className="w-4 h-4 text-purple-300" />
+              Surprise Wheel
+            </button>
+
+            <button
+              onClick={() => setIsTournamentOpen(true)}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 py-3 px-4 rounded-2xl font-bold text-xs sm:text-sm bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/40 transition-all active:scale-95"
+              title="Start a multi-game tournament series"
+            >
+              <Trophy className="w-4 h-4 text-amber-400" />
+              Tournament Mode
             </button>
           </div>
         </div>
@@ -272,6 +296,26 @@ export function MainHubPage() {
           </div>
         </div>
       )}
+
+      {/* SURPRISE GAME SPINNER MODAL */}
+      <RandomGameSpinnerModal
+        isOpen={isSpinnerOpen}
+        onClose={() => setIsSpinnerOpen(false)}
+        onSelectGame={(gameId) => {
+          setIsSpinnerOpen(false);
+          handlePlayGame(gameId);
+        }}
+      />
+
+      {/* TOURNAMENT MODE MODAL */}
+      <TournamentModeModal
+        isOpen={isTournamentOpen}
+        onClose={() => setIsTournamentOpen(false)}
+        onLaunchGame={(gameId) => {
+          setIsTournamentOpen(false);
+          handlePlayGame(gameId);
+        }}
+      />
 
       {/* PLAYER MANAGER MODAL */}
       <PlayerManagerModal

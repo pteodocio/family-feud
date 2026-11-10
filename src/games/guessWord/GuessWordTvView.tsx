@@ -10,6 +10,8 @@ interface GuessWordTvState {
   currentPoints: number;
   isWordRevealed: boolean;
   secretWord: string | null;
+  letterCount?: number;
+  wordLetterBlanks?: string;
   teams: ScoreboardParticipant[];
   isGameFinished: boolean;
 }
@@ -54,7 +56,17 @@ export function GuessWordTvView() {
     );
   }
 
-  const { category, revealedClues, currentPoints, isWordRevealed, secretWord, teams, isGameFinished } = state;
+  const {
+    category,
+    revealedClues,
+    currentPoints,
+    isWordRevealed,
+    secretWord,
+    letterCount,
+    wordLetterBlanks,
+    teams,
+    isGameFinished,
+  } = state;
   const sortedTeams = [...teams].sort((a, b) => b.score - a.score);
   const winner = sortedTeams[0];
 
@@ -124,11 +136,18 @@ export function GuessWordTvView() {
             </div>
           ) : (
             <div className="bg-[#120824] border-2 border-purple-900/60 rounded-3xl p-6 sm:p-8 shadow-2xl mb-6 text-center">
-              <span className="text-xs font-black uppercase tracking-[0.25em] text-purple-400 block mb-2 animate-pulse">
-                [ MYSTERY WORD ]
-              </span>
-              <div className="font-mono font-black text-3xl sm:text-5xl text-purple-200 tracking-widest">
-                ? ? ? ? ?
+              <div className="flex items-center justify-between mb-3 px-2 sm:px-4">
+                <span className="text-xs font-black uppercase tracking-[0.25em] text-purple-400 animate-pulse">
+                  [ MYSTERY WORD ]
+                </span>
+                {letterCount ? (
+                  <span className="text-xs font-bold text-purple-300 bg-purple-950/80 px-3 py-0.5 rounded-full border border-purple-800">
+                    {letterCount} Letters
+                  </span>
+                ) : null}
+              </div>
+              <div className="font-mono font-black text-3xl sm:text-5xl text-purple-200 tracking-[0.3em]">
+                {wordLetterBlanks || '? ? ? ? ?'}
               </div>
             </div>
           )}

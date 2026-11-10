@@ -225,9 +225,32 @@ export function BingoHostView({ teams, onEndGame, onReturnToHub }: BingoHostView
             </div>
           )}
 
-          <div className="text-xs text-slate-400 mt-3 font-medium">
+          <div className="text-xs text-slate-400 mt-2 font-medium">
             Winning Rule: {BINGO_PATTERNS.find((p) => p.id === selectedPatternId)?.description}
           </div>
+
+          {/* Recent 5 Balls Reel */}
+          {calledNumbers.length > 1 && (
+            <div className="mt-3 pt-3 border-t border-amber-900/60 w-full">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400/80 block mb-1.5">
+                Recent Balls:
+              </span>
+              <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                {calledNumbers.slice(-5).reverse().map((n, idx) => (
+                  <span
+                    key={idx}
+                    className={`px-2 py-0.5 rounded-md text-xs font-mono font-bold ${
+                      idx === 0
+                        ? 'bg-amber-400 text-slate-950 font-black'
+                        : 'bg-amber-950/80 text-amber-300 border border-amber-800'
+                    }`}
+                  >
+                    {getBingoLetter(n)}{n}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right 2 Cols: 75 Master Board Grid */}

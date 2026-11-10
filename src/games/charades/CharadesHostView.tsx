@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, Shuffle, Eye, CheckCircle2, Sparkles } from 'lucide-react';
+import { Play, Shuffle, Eye, CheckCircle2, Sparkles, SkipForward, Clock } from 'lucide-react';
 import { CHARADES_WORDS, CHARADES_CATEGORIES, type CharadesWord } from '../../data/hubData/charadesWords';
 import { SharedTimer } from '../../components/shared/SharedTimer';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
@@ -47,6 +47,8 @@ export function CharadesHostView({ teams: initialTeams, onEndGame, onReturnToHub
   });
   const [isWordRevealedOnTv, setIsWordRevealedOnTv] = useState(false);
   const [timerRunning, setTimerRunning] = useState(false);
+  const [timerDuration, setTimerDuration] = useState<30 | 60 | 90>(60);
+  const [skipsCount, setSkipsCount] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedDifficulty, setSelectedDifficulty] = useState<'all' | 'easy' | 'medium' | 'hard'>('all');
   const [isGameFinished, setIsGameFinished] = useState(false);
@@ -69,6 +71,12 @@ export function CharadesHostView({ teams: initialTeams, onEndGame, onReturnToHub
     setCurrentWord(chosen);
     setIsWordRevealedOnTv(false);
     setTimerRunning(false);
+  };
+
+  const handleSkipWord = () => {
+    setSkipsCount((prev) => prev + 1);
+    soundManager.playPartyCue('tick');
+    pickRandomWord();
   };
 
   const handleGenerateFreshWord = async () => {
@@ -138,7 +146,8 @@ export function CharadesHostView({ teams: initialTeams, onEndGame, onReturnToHub
 
   const handleNextTurn = () => {
     setActiveTeamIndex((prev) => prev + 1);
-    hubSyncBus.broadcastTimer(60, false);
+    setSkipsCount(0);
+    hubSyncBus.broadcastTimer(timerDuration, false);
     pickRandomWord();
   };
 
@@ -163,6 +172,21 @@ export function CharadesHostView({ teams: initialTeams, onEndGame, onReturnToHub
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Timer preset selector */}
+          <div className="flex items-center gap-1 bg-slate-950 border border-slate-700 rounded-xl px-2 py-1">
+            <Clock className="w-3.5 h-3.5 text-slate-400" />
+            <select
+              value={timerDuration}
+              onChange={(e) => setTimerDuration(Number(e.target.value) as any)}
+              className="bg-transparent text-xs text-white focus:outline-none"
+              title="Timer Duration"
+            >
+              <option value={30}>30s</option>
+              <option value={60}>60s</option>
+              <option value={90}>90s</option>
+            </select>
+          </div>
+
           {/* Category Filter */}
           <select
             value={selectedCategory}
@@ -228,7 +252,7 @@ export function CharadesHostView({ teams: initialTeams, onEndGame, onReturnToHub
           </span>
 
           <SharedTimer
-            initialSeconds={60}
+            initialSeconds={timerDuration}
             isRunning={timerRunning}
             onTick={(sec) => hubSyncBus.broadcastTimer(sec, true)}
             onExpire={() => {
@@ -254,7 +278,7 @@ export function CharadesHostView({ teams: initialTeams, onEndGame, onReturnToHub
             className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-bold shadow-lg transition-transform active:scale-95"
           >
             <Play className="w-4 h-4 fill-current" />
-            {timerRunning ? 'Pause 60s Timer' : 'Start 60s Timer'}
+            {timerRunning ? `Pause ${timerDuration}s Timer` : `Start ${timerDuration}s Timer`}
           </button>
 
           <button
@@ -263,6 +287,15 @@ export function CharadesHostView({ teams: initialTeams, onEndGame, onReturnToHub
           >
             <CheckCircle2 className="w-5 h-5" />
             Guessed Correctly! (+{currentWord.points} pts)
+          </button>
+
+          <button
+            onClick={handleSkipWord}
+            className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-sm font-bold transition-colors"
+            title="Pass to next word if actor is stumped"
+          >
+            <SkipForward className="w-4 h-4" />
+            Pass / Skip ({skipsCount})
           </button>
 
           <button
@@ -298,6 +331,7 @@ export function CharadesHostView({ teams: initialTeams, onEndGame, onReturnToHub
         onPlayAgain={() => {
           setTeams((prev) => prev.map((t) => ({ ...t, score: 0 })));
           setActiveTeamIndex(0);
+          setSkipsCount(0);
           pickRandomWord();
           setIsGameFinished(false);
         }}

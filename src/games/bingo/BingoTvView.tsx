@@ -82,6 +82,29 @@ export function BingoTvView() {
           <div className="text-xs text-amber-300/80 mt-4 max-w-[220px]">
             {selectedPattern?.description}
           </div>
+
+          {/* Recent 5 Balls Reel */}
+          {calledNumbers.length > 1 && (
+            <div className="mt-4 pt-3 border-t border-amber-900/60 w-full">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400/80 block mb-1.5">
+                Recent Balls:
+              </span>
+              <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                {calledNumbers.slice(-5).reverse().map((n, idx) => (
+                  <span
+                    key={idx}
+                    className={`px-2.5 py-1 rounded-lg text-xs sm:text-sm font-mono font-bold ${
+                      idx === 0
+                        ? 'bg-amber-400 text-slate-950 font-black shadow'
+                        : 'bg-amber-950/80 text-amber-300 border border-amber-800'
+                    }`}
+                  >
+                    {getBingoLetter(n)}{n}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 75-Number Master Tracking Grid */}

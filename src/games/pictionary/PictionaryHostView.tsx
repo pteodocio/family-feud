@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Shuffle, CheckCircle2, Sparkles } from 'lucide-react';
+import { Shuffle, CheckCircle2, Sparkles, Play, Eye } from 'lucide-react';
 import { PICTIONARY_WORDS, PICTIONARY_CATEGORIES, type PictionaryWord } from '../../data/hubData/pictionaryWords';
 import { DrawingCanvas, type DrawingCanvasHandle } from '../../components/shared/DrawingCanvas';
 import { SharedTimer } from '../../components/shared/SharedTimer';
@@ -233,8 +233,16 @@ export function PictionaryHostView({ teams: initialTeams, onEndGame, onReturnToH
           />
 
           <button
+            onClick={() => setTimerRunning((prev) => !prev)}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow"
+          >
+            <Play className="w-4 h-4 fill-current" />
+            {timerRunning ? 'Pause Clock' : 'Start 60s Clock'}
+          </button>
+
+          <button
             onClick={handleCorrectGuess}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors active:scale-95 shadow"
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold transition-colors active:scale-95 shadow"
           >
             <CheckCircle2 className="w-4 h-4" />
             Correct (+25 pts)
@@ -242,8 +250,9 @@ export function PictionaryHostView({ teams: initialTeams, onEndGame, onReturnToH
 
           <button
             onClick={() => setIsWordRevealedOnTv((prev) => !prev)}
-            className="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors"
           >
+            <Eye className="w-4 h-4" />
             {isWordRevealedOnTv ? 'Hide on TV' : 'Reveal on TV'}
           </button>
 
