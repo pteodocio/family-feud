@@ -3,8 +3,8 @@ import { GAMES_CATALOG, getGameById } from './registry';
 import { generateBingoCard, checkBingoWin } from '../data/hubData/bingoPatterns';
 
 describe('Modular Game Engines & Registry', () => {
-  it('registry has all 6 games registered with required metadata', () => {
-    expect(GAMES_CATALOG).toHaveLength(6);
+  it('registry has all 16 games registered with required metadata', () => {
+    expect(GAMES_CATALOG).toHaveLength(16);
     const ids = GAMES_CATALOG.map((g) => g.id);
     expect(ids).toContain('family-feud');
     expect(ids).toContain('family-trivia');
@@ -12,6 +12,18 @@ describe('Modular Game Engines & Registry', () => {
     expect(ids).toContain('pictionary');
     expect(ids).toContain('family-bingo');
     expect(ids).toContain('guess-the-word');
+
+    // 10 new team battle games
+    expect(ids).toContain('password');
+    expect(ids).toContain('catchphrase');
+    expect(ids).toContain('taboo');
+    expect(ids).toContain('jeopardy');
+    expect(ids).toContain('wheel-of-fortune');
+    expect(ids).toContain('bluff-the-answer');
+    expect(ids).toContain('heads-up');
+    expect(ids).toContain('word-hunt');
+    expect(ids).toContain('scattergories');
+    expect(ids).toContain('trivia-elimination');
 
     GAMES_CATALOG.forEach((g) => {
       expect(g.name).toBeDefined();

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, CheckCircle2, XCircle, Heart, Trophy, Sparkles, ShieldAlert, ArrowRight, RefreshCw } from 'lucide-react';
+import { CheckCircle2, XCircle, Heart, ShieldAlert, ArrowRight } from 'lucide-react';
 import { generateProceduralElimination, type EliminationQuestion } from '../../services/localGenerators/eliminationGenerator';
 import { SharedTimer } from '../../components/shared/SharedTimer';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';

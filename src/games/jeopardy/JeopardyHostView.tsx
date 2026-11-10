@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, CheckCircle2, XCircle, Eye, Trophy, Sparkles, HelpCircle, ArrowLeft } from 'lucide-react';
+import { CheckCircle2, XCircle, Eye, Trophy } from 'lucide-react';
 import { generateProceduralJeopardy, type JeopardyBoard, type JeopardyQuestion } from '../../services/localGenerators/jeopardyGenerator';
 import { SharedTimer } from '../../components/shared/SharedTimer';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';

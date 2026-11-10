@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { KeyRound, Sparkles, Trophy } from 'lucide-react';
+import { KeyRound, Sparkles } from 'lucide-react';
 import { hubSyncBus } from '../../sync/hubSync';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
 

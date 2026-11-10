@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Heart, ShieldAlert, Trophy, CheckCircle2 } from 'lucide-react';
+import { Heart, ShieldAlert } from 'lucide-react';
 import { hubSyncBus } from '../../sync/hubSync';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, CheckCircle2, ArrowRight, Shuffle, Eye, Trophy, Sparkles, MessageSquareQuote } from 'lucide-react';
+import { Shuffle, Eye, MessageSquareQuote } from 'lucide-react';
 import { generateProceduralBluff, type BluffItem } from '../../services/localGenerators/bluffGenerator';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
 import { WinnerPodiumModal } from '../../components/shared/WinnerPodiumModal';

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, CheckCircle2, ArrowRight, Ban, Trophy, Volume2, Sparkles, ShieldAlert } from 'lucide-react';
+import { CheckCircle2, Ban, ShieldAlert } from 'lucide-react';
 import { generateProceduralTaboo, type TabooCard } from '../../services/localGenerators/tabooGenerator';
 import { SharedTimer } from '../../components/shared/SharedTimer';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';

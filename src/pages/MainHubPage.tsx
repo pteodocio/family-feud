@@ -14,6 +14,7 @@ import type { GameSession } from '../types/game';
 export function MainHubPage() {
   const { navigate, openDisplayWindow } = useRouter();
   const [selectedRulesGame, setSelectedRulesGame] = useState<GameCatalogItem | null>(null);
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('All');
   const [isPlayerManagerOpen, setIsPlayerManagerOpen] = useState(false);
   const [isSpinnerOpen, setIsSpinnerOpen] = useState(false);
   const [isTournamentOpen, setIsTournamentOpen] = useState(false);
@@ -224,7 +225,7 @@ export function MainHubPage() {
 
       {/* GAME LIBRARY SECTION */}
       <main ref={libraryRef} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full flex-1">
-        <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-800">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-800">
           <div>
             <h2 className="font-display font-black text-2xl sm:text-3xl text-white">
               Game Library
@@ -233,14 +234,53 @@ export function MainHubPage() {
               Select any game below to start playing with your family.
             </p>
           </div>
-          <span className="text-xs font-bold text-slate-400 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800">
-            6 Games Available
+          <span className="text-xs font-bold text-slate-300 bg-slate-900 px-3.5 py-1.5 rounded-xl border border-slate-800">
+            {GAMES_CATALOG.length} Games Available
           </span>
         </div>
 
-        {/* 6 Game Cards Grid */}
+        {/* Category Filter Pills */}
+        <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-2 scrollbar-none">
+          {[
+            { id: 'All', label: 'All Games', count: GAMES_CATALOG.length },
+            { id: 'Team Battle Games', label: '⚔️ Team Battle Games', count: GAMES_CATALOG.filter((g) => g.category === 'Team Battle Games').length },
+            { id: 'TV Game Shows', label: '📺 TV Game Shows', count: GAMES_CATALOG.filter((g) => g.category === 'TV Game Show').length },
+            { id: 'Party & Word Games', label: '🎉 Party & Word Games', count: GAMES_CATALOG.filter((g) => g.category !== 'Team Battle Games' && g.category !== 'TV Game Show').length },
+          ].map((cat) => {
+            const isActive = selectedCategoryFilter === cat.id;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategoryFilter(cat.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all border ${
+                  isActive
+                    ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md shadow-amber-400/20 font-black scale-105'
+                    : 'bg-slate-900/80 hover:bg-slate-800 text-slate-300 border-slate-800'
+                }`}
+              >
+                <span>{cat.label}</span>
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full ${
+                    isActive ? 'bg-slate-950 text-amber-300' : 'bg-slate-800 text-slate-400'
+                  }`}
+                >
+                  {cat.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Game Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {GAMES_CATALOG.map((game) => (
+          {GAMES_CATALOG.filter((game) => {
+            if (selectedCategoryFilter === 'All') return true;
+            if (selectedCategoryFilter === 'Team Battle Games') return game.category === 'Team Battle Games';
+            if (selectedCategoryFilter === 'TV Game Shows') return game.category === 'TV Game Show';
+            if (selectedCategoryFilter === 'Party & Word Games')
+              return game.category !== 'Team Battle Games' && game.category !== 'TV Game Show';
+            return true;
+          }).map((game) => (
             <GameCard
               key={game.id}
               game={game}

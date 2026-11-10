@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, CheckCircle2, ArrowRight, Eye, Trophy, RefreshCw, KeyRound, Sparkles } from 'lucide-react';
+import { CheckCircle2, ArrowRight, Eye, KeyRound, Sparkles } from 'lucide-react';
 import { generateProceduralPassword, type PasswordItem } from '../../services/localGenerators/passwordGenerator';
 import { SharedTimer } from '../../components/shared/SharedTimer';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
@@ -73,7 +73,6 @@ export function PasswordHostView({ teams: initialTeams, onEndGame, onReturnToHub
     hubSyncBus.broadcastSoundTrigger('correct');
     setIsRevealed(true);
 
-    const winningTeam = teams[activeTeamIdx];
     const updated = teams.map((t, idx) =>
       idx === activeTeamIdx ? { ...t, score: t.score + currentPoints } : t
     );

@@ -90,7 +90,7 @@ export function RandomGameSpinnerModal({
         </div>
 
         {/* Carousel / Wheel Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6 max-h-64 sm:max-h-72 overflow-y-auto pr-1 scrollbar-thin">
           {GAMES_CATALOG.map((g, idx) => {
             const isHighlighted = idx === highlightedIndex;
             return (

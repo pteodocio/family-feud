@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, CheckCircle2, RotateCw, AlertTriangle, Eye, Trophy, Sparkles } from 'lucide-react';
+import { CheckCircle2, RotateCw, Sparkles } from 'lucide-react';
 import { generateProceduralWheel, type WheelPuzzle } from '../../services/localGenerators/wheelGenerator';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
 import { WinnerPodiumModal } from '../../components/shared/WinnerPodiumModal';

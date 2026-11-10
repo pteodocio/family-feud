@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Smile, Clock, Trophy } from 'lucide-react';
+import { Smile } from 'lucide-react';
 import { hubSyncBus } from '../../sync/hubSync';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
 

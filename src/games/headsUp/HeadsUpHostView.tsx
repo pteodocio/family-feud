@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, CheckCircle2, XCircle, ArrowRight, Trophy, Sparkles, Smile } from 'lucide-react';
+import { CheckCircle2, XCircle, Smile } from 'lucide-react';
 import { generateProceduralHeadsUp, type HeadsUpCard } from '../../services/localGenerators/headsUpGenerator';
 import { SharedTimer } from '../../components/shared/SharedTimer';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';

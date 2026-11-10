@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MessageSquareQuote, CheckCircle2, Sparkles, Trophy } from 'lucide-react';
+import { MessageSquareQuote } from 'lucide-react';
 import { hubSyncBus } from '../../sync/hubSync';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
 

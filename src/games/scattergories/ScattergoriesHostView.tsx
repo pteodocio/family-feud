@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, CheckCircle2, ArrowRight, Dices, Trophy, Sparkles, RefreshCw, Check, X } from 'lucide-react';
+import { Dices, RefreshCw } from 'lucide-react';
 import { generateProceduralScattergories, type ScattergoriesRound } from '../../services/localGenerators/scattergoriesGenerator';
 import { SharedTimer } from '../../components/shared/SharedTimer';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';

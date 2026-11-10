@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, CheckCircle2, ArrowRight, Trophy, Zap, RefreshCw, Flame } from 'lucide-react';
+import { CheckCircle2, Flame } from 'lucide-react';
 import { generateProceduralCatchphrase, type CatchphraseItem } from '../../services/localGenerators/catchphraseGenerator';
 import { SharedTimer } from '../../components/shared/SharedTimer';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';

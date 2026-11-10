@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, CheckCircle2, ArrowRight, Grid, Trophy, Sparkles, RefreshCw, Check, X } from 'lucide-react';
+import { Grid, RefreshCw, Check, X } from 'lucide-react';
 import { generateProceduralWordHunt, checkWordPathOnGrid } from '../../services/localGenerators/wordHuntGenerator';
 import { SharedTimer } from '../../components/shared/SharedTimer';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';

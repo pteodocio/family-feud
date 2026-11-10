@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Grid, Clock, Trophy } from 'lucide-react';
+import { Grid } from 'lucide-react';
 import { hubSyncBus } from '../../sync/hubSync';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
 
