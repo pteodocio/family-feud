@@ -49,8 +49,8 @@ export function CharadesHostView({ teams: initialTeams, onEndGame, onReturnToHub
     setTimerRunning(false);
   };
 
-  // Broadcast state to TV Display
-  useEffect(() => {
+  // Broadcast state to TV Display whenever state changes or sync is requested
+  const broadcastCurrentState = () => {
     hubSyncBus.broadcastState({
       gameId: 'charades',
       category: currentWord.category,
@@ -61,6 +61,17 @@ export function CharadesHostView({ teams: initialTeams, onEndGame, onReturnToHub
       teams,
       isGameFinished,
     });
+  };
+
+  useEffect(() => {
+    broadcastCurrentState();
+  }, [currentWord, isWordRevealedOnTv, activeTeam, teams, isGameFinished]);
+
+  useEffect(() => {
+    const unsub = hubSyncBus.onRequestSync(() => {
+      broadcastCurrentState();
+    });
+    return () => unsub();
   }, [currentWord, isWordRevealedOnTv, activeTeam, teams, isGameFinished]);
 
   const handleCorrectGuess = () => {
@@ -71,11 +82,14 @@ export function CharadesHostView({ teams: initialTeams, onEndGame, onReturnToHub
     );
     setIsWordRevealedOnTv(true);
     setTimerRunning(false);
+    hubSyncBus.broadcastTimer(0, false);
     soundManager.playPartyCue('correct');
+    hubSyncBus.broadcastSound('correct');
   };
 
   const handleNextTurn = () => {
     setActiveTeamIndex((prev) => prev + 1);
+    hubSyncBus.broadcastTimer(60, false);
     pickRandomWord();
   };
 
@@ -157,7 +171,11 @@ export function CharadesHostView({ teams: initialTeams, onEndGame, onReturnToHub
           <SharedTimer
             initialSeconds={60}
             isRunning={timerRunning}
-            onExpire={() => setTimerRunning(false)}
+            onTick={(sec) => hubSyncBus.broadcastTimer(sec, true)}
+            onExpire={() => {
+              setTimerRunning(false);
+              hubSyncBus.broadcastTimer(0, false);
+            }}
           />
         </div>
 

@@ -4,6 +4,7 @@ import type { HubCanvasStroke } from '../../sync/hubSync';
 
 export interface DrawingCanvasHandle {
   drawStroke: (stroke: HubCanvasStroke) => void;
+  drawStrokes: (strokes: HubCanvasStroke[]) => void;
   clear: () => void;
 }
 
@@ -67,6 +68,25 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>
         ctx.moveTo(stroke.x0 * w, stroke.y0 * h);
         ctx.lineTo(stroke.x1 * w, stroke.y1 * h);
         ctx.stroke();
+      },
+      drawStrokes: (strokes: HubCanvasStroke[]) => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const w = canvas.width;
+        const h = canvas.height;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        for (const stroke of strokes) {
+          ctx.strokeStyle = stroke.color;
+          ctx.lineWidth = stroke.size;
+          ctx.beginPath();
+          ctx.moveTo(stroke.x0 * w, stroke.y0 * h);
+          ctx.lineTo(stroke.x1 * w, stroke.y1 * h);
+          ctx.stroke();
+        }
       },
       clear: () => {
         const canvas = canvasRef.current;

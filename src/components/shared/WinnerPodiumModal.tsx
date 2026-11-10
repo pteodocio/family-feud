@@ -109,7 +109,7 @@ export function WinnerPodiumModal({
             className="w-full sm:flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-sm bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 transition-colors"
           >
             <Home className="w-4 h-4" />
-            Game Hub
+            Return to Hub
           </button>
         </div>
       </div>

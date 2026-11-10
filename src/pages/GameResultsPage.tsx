@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, Printer, Trophy, RotateCcw } from 'lucide-react';
 import { useRouter } from '../router/Router';
 import { loadGameSession } from '../db/database';
+import { recordGameHistory } from '../db/hubDatabase';
 import type { GameSession } from '../types/game';
 
 interface GameResultsPageProps {
@@ -14,7 +15,24 @@ export function GameResultsPage({ gameId }: GameResultsPageProps) {
 
   useEffect(() => {
     loadGameSession(gameId).then((loaded) => {
-      if (loaded) setSession(loaded);
+      if (loaded) {
+        setSession(loaded);
+        const champ = loaded.team1.score >= loaded.team2.score ? loaded.team1 : loaded.team2;
+        recordGameHistory({
+          id: `feud_${loaded.id}`,
+          gameId: 'family-feud',
+          gameTitle: 'Family Feud',
+          datePlayed: loaded.createdAt || new Date().toISOString(),
+          durationSeconds: 600,
+          gameMode: 'team',
+          participants: [
+            { id: loaded.team1.id, name: loaded.team1.name, score: loaded.team1.score, isWinner: loaded.team1.score >= loaded.team2.score },
+            { id: loaded.team2.id, name: loaded.team2.name, score: loaded.team2.score, isWinner: loaded.team2.score > loaded.team1.score },
+          ],
+          winnerName: champ.name,
+          winnerScore: champ.score,
+        }).catch(() => {});
+      }
     });
   }, [gameId]);
 

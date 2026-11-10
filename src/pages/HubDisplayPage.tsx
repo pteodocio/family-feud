@@ -6,14 +6,20 @@ import { PictionaryTvView } from '../games/pictionary/PictionaryTvView';
 import { BingoTvView } from '../games/bingo/BingoTvView';
 import { GuessWordTvView } from '../games/guessWord/GuessWordTvView';
 import { soundManager } from '../audio/soundManager';
+import { hubSyncBus } from '../sync/hubSync';
 import { loadSettings } from '../db/database';
 
 interface HubDisplayPageProps {
   gameId: string;
 }
 
-export function HubDisplayPage({ gameId }: HubDisplayPageProps) {
+export function HubDisplayPage({ gameId: initialGameId }: HubDisplayPageProps) {
+  const [activeGameId, setActiveGameId] = useState(initialGameId);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    setActiveGameId(initialGameId);
+  }, [initialGameId]);
 
   useEffect(() => {
     // Unlock Audio Context on first TV screen interaction
@@ -34,6 +40,24 @@ export function HubDisplayPage({ gameId }: HubDisplayPageProps) {
       }
     });
 
+    // Listen for party sound triggers from host
+    const unsubSound = hubSyncBus.onSoundTrigger((cue) => {
+      loadSettings().then((s) => {
+        const dest = s?.audioDestination || 'both';
+        if (dest !== 'host_only') {
+          soundManager.playPartyCue(cue);
+        }
+      });
+    });
+
+    // Listen for dynamic game switching from host
+    const unsubState = hubSyncBus.onStateUpdate((incoming) => {
+      if (incoming?.gameId && incoming.gameId !== activeGameId) {
+        setActiveGameId(incoming.gameId);
+        window.location.hash = `#/display/hub/${incoming.gameId}`;
+      }
+    });
+
     const handleFullscreenChange = () => {
       setIsFullscreen(Boolean(document.fullscreenElement));
     };
@@ -43,8 +67,10 @@ export function HubDisplayPage({ gameId }: HubDisplayPageProps) {
       window.removeEventListener('pointerdown', unlockAudio);
       window.removeEventListener('keydown', unlockAudio);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      unsubSound();
+      unsubState();
     };
-  }, []);
+  }, [activeGameId]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -66,11 +92,11 @@ export function HubDisplayPage({ gameId }: HubDisplayPageProps) {
       </button>
 
       {/* Dynamic Game TV Board */}
-      {gameId === 'family-trivia' && <TriviaTvView />}
-      {gameId === 'charades' && <CharadesTvView />}
-      {gameId === 'pictionary' && <PictionaryTvView />}
-      {gameId === 'family-bingo' && <BingoTvView />}
-      {gameId === 'guess-the-word' && <GuessWordTvView />}
+      {activeGameId === 'family-trivia' && <TriviaTvView />}
+      {activeGameId === 'charades' && <CharadesTvView />}
+      {activeGameId === 'pictionary' && <PictionaryTvView />}
+      {activeGameId === 'family-bingo' && <BingoTvView />}
+      {activeGameId === 'guess-the-word' && <GuessWordTvView />}
     </div>
   );
 }

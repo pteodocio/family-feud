@@ -90,6 +90,15 @@ export async function initializeDatabase(): Promise<void> {
         await db.questionPacks.put(pack);
       }
     }
+
+    // Seed default starter teams for Hub games if none configured yet
+    const teamCount = await db.teams.count();
+    if (teamCount === 0) {
+      await db.teams.bulkPut([
+        { id: 'team_santos', name: 'Santos Family', color: 'blue', score: 0, playerIds: [] },
+        { id: 'team_reyes', name: 'Reyes Family', color: 'red', score: 0, playerIds: [] },
+      ]);
+    }
   } catch (err) {
     console.error('Database initialization error:', err);
   }

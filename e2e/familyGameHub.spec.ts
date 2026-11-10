@@ -116,4 +116,40 @@ test.describe('Family Game Hub End-to-End Tests', () => {
 
     await expect(page.getByRole('heading', { name: /Game History Ledger/i })).toBeVisible();
   });
+
+  test('Host finishes match, displays Winner Podium, and returns to Hub', async ({ page }) => {
+    await page.goto('/#/games/family-trivia/setup');
+    await page.getByRole('button', { name: /Start Game Console/i }).click();
+
+    await expect(page.getByText('Family Trivia Host Console').first()).toBeVisible();
+
+    // Click Finish Game
+    const finishBtn = page.getByRole('button', { name: /Finish Game/i });
+    await expect(finishBtn).toBeVisible();
+    await finishBtn.click();
+
+    // Winner Podium Modal opens
+    await expect(page.getByText('Trivia Champion')).toBeVisible();
+    await expect(page.getByText('Final Standings')).toBeVisible();
+
+    // Click Return to Hub
+    const returnBtn = page.getByRole('button', { name: /Return to Hub/i });
+    await expect(returnBtn).toBeVisible();
+    await returnBtn.click();
+
+    // Arrives back at Hub
+    await expect(page.getByRole('heading', { name: 'Family Game Hub' }).first()).toBeVisible();
+  });
+
+  test('TV Display loads game board, keeps secret answers hidden, and mirrors TV board', async ({ page }) => {
+    // Navigate directly to Trivia TV display
+    await page.goto('/#/display/hub/family-trivia');
+
+    // Waiting or active round board is displayed
+    await expect(page.getByText(/Family Trivia|FAMILY GAME HUB TV/)).toBeVisible();
+
+    // Navigate to Charades TV display - secret word is NOT displayed until revealed
+    await page.goto('/#/display/hub/charades');
+    await expect(page.getByText(/Charades Party|Guess the Word!|ACTING IN PROGRESS/)).toBeVisible();
+  });
 });

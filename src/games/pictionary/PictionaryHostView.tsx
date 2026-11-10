@@ -33,6 +33,8 @@ export function PictionaryHostView({ teams: initialTeams, onEndGame, onReturnToH
 
   const activeTeam = teams[activeTeamIndex % teams.length];
 
+  const strokesHistoryRef = useRef<any[]>([]);
+
   const pickRandomWord = () => {
     let pool = PICTIONARY_WORDS;
     if (selectedCategory !== 'All') {
@@ -44,11 +46,13 @@ export function PictionaryHostView({ teams: initialTeams, onEndGame, onReturnToH
     setCurrentWord(chosen);
     setIsWordRevealedOnTv(false);
     setTimerRunning(false);
+    strokesHistoryRef.current = [];
     canvasRef.current?.clear();
     hubSyncBus.broadcastCanvasClear();
+    hubSyncBus.broadcastTimer(60, false);
   };
 
-  useEffect(() => {
+  const broadcastCurrentState = () => {
     hubSyncBus.broadcastState({
       gameId: 'pictionary',
       category: currentWord.category,
@@ -57,6 +61,20 @@ export function PictionaryHostView({ teams: initialTeams, onEndGame, onReturnToH
       teams,
       isGameFinished,
     });
+  };
+
+  useEffect(() => {
+    broadcastCurrentState();
+  }, [currentWord, isWordRevealedOnTv, activeTeam, teams, isGameFinished]);
+
+  useEffect(() => {
+    const unsub = hubSyncBus.onRequestSync(() => {
+      broadcastCurrentState();
+      if (strokesHistoryRef.current.length > 0) {
+        hubSyncBus.broadcastCanvasHistory(strokesHistoryRef.current);
+      }
+    });
+    return () => unsub();
   }, [currentWord, isWordRevealedOnTv, activeTeam, teams, isGameFinished]);
 
   const handleCorrectGuess = () => {
@@ -67,7 +85,9 @@ export function PictionaryHostView({ teams: initialTeams, onEndGame, onReturnToH
     );
     setIsWordRevealedOnTv(true);
     setTimerRunning(false);
+    hubSyncBus.broadcastTimer(0, false);
     soundManager.playPartyCue('correct');
+    hubSyncBus.broadcastSound('correct');
   };
 
   const handleNextTurn = () => {
@@ -144,7 +164,11 @@ export function PictionaryHostView({ teams: initialTeams, onEndGame, onReturnToH
           <SharedTimer
             initialSeconds={60}
             isRunning={timerRunning}
-            onExpire={() => setTimerRunning(false)}
+            onTick={(sec) => hubSyncBus.broadcastTimer(sec, true)}
+            onExpire={() => {
+              setTimerRunning(false);
+              hubSyncBus.broadcastTimer(0, false);
+            }}
           />
 
           <button
@@ -175,8 +199,14 @@ export function PictionaryHostView({ teams: initialTeams, onEndGame, onReturnToH
       <div className="h-[460px] w-full">
         <DrawingCanvas
           ref={canvasRef}
-          onStroke={(stroke) => hubSyncBus.broadcastCanvasStroke(stroke)}
-          onClear={() => hubSyncBus.broadcastCanvasClear()}
+          onStroke={(stroke) => {
+            strokesHistoryRef.current.push(stroke);
+            hubSyncBus.broadcastCanvasStroke(stroke);
+          }}
+          onClear={() => {
+            strokesHistoryRef.current = [];
+            hubSyncBus.broadcastCanvasClear();
+          }}
         />
       </div>
 

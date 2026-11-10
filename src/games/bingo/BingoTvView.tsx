@@ -13,7 +13,9 @@ interface BingoTvState {
 }
 
 export function BingoTvView() {
-  const [state, setState] = useState<BingoTvState | null>(null);
+  const [state, setState] = useState<BingoTvState | null>(() => {
+    return hubSyncBus.getLastState('family-bingo');
+  });
 
   useEffect(() => {
     const unsub = hubSyncBus.onStateUpdate((incoming) => {

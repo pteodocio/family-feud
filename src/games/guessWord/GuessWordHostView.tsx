@@ -39,8 +39,8 @@ export function GuessWordHostView({ teams: initialTeams, onEndGame, onReturnToHu
   const currentPuzzle = filteredPuzzles[puzzleIndex % filteredPuzzles.length];
   const currentAvailablePoints = CLUE_POINTS[revealedClueCount - 1] || 10;
 
-  // Broadcast state to TV
-  useEffect(() => {
+  // Broadcast state to TV whenever state changes or sync is requested
+  const broadcastCurrentState = () => {
     hubSyncBus.broadcastState({
       gameId: 'guess-the-word',
       category: currentPuzzle.category,
@@ -51,12 +51,24 @@ export function GuessWordHostView({ teams: initialTeams, onEndGame, onReturnToHu
       teams,
       isGameFinished,
     });
+  };
+
+  useEffect(() => {
+    broadcastCurrentState();
+  }, [currentPuzzle, revealedClueCount, currentAvailablePoints, isWordRevealed, teams, isGameFinished]);
+
+  useEffect(() => {
+    const unsub = hubSyncBus.onRequestSync(() => {
+      broadcastCurrentState();
+    });
+    return () => unsub();
   }, [currentPuzzle, revealedClueCount, currentAvailablePoints, isWordRevealed, teams, isGameFinished]);
 
   const handleRevealNextClue = () => {
     if (revealedClueCount < 4) {
       setRevealedClueCount((prev) => prev + 1);
       soundManager.playPartyCue('tick');
+      hubSyncBus.broadcastSound('tick');
     }
   };
 
@@ -66,13 +78,16 @@ export function GuessWordHostView({ teams: initialTeams, onEndGame, onReturnToHu
     );
     setIsWordRevealed(true);
     setTimerRunning(false);
+    hubSyncBus.broadcastTimer(0, false);
     soundManager.playPartyCue('correct');
+    hubSyncBus.broadcastSound('correct');
   };
 
   const handleNextPuzzle = () => {
     setIsWordRevealed(false);
     setRevealedClueCount(1);
     setTimerRunning(false);
+    hubSyncBus.broadcastTimer(45, false);
     setPuzzleIndex((prev) => prev + 1);
   };
 
@@ -145,7 +160,11 @@ export function GuessWordHostView({ teams: initialTeams, onEndGame, onReturnToHu
               <SharedTimer
                 initialSeconds={30}
                 isRunning={timerRunning}
-                onExpire={() => setTimerRunning(false)}
+                onTick={(sec) => hubSyncBus.broadcastTimer(sec, true)}
+                onExpire={() => {
+                  setTimerRunning(false);
+                  hubSyncBus.broadcastTimer(0, false);
+                }}
               />
             </div>
           </div>

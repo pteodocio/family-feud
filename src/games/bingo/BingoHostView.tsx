@@ -34,8 +34,8 @@ export function BingoHostView({ teams, onEndGame, onReturnToHub }: BingoHostView
     setPlayerCards(cards);
   }, [teams]);
 
-  // Broadcast state to TV
-  useEffect(() => {
+  // Broadcast state to TV whenever state changes or sync is requested
+  const broadcastCurrentState = () => {
     hubSyncBus.broadcastState({
       gameId: 'family-bingo',
       calledNumbers,
@@ -44,6 +44,17 @@ export function BingoHostView({ teams, onEndGame, onReturnToHub }: BingoHostView
       winnerName,
       isGameFinished,
     });
+  };
+
+  useEffect(() => {
+    broadcastCurrentState();
+  }, [calledNumbers, currentNumber, selectedPatternId, winnerName, isGameFinished]);
+
+  useEffect(() => {
+    const unsub = hubSyncBus.onRequestSync(() => {
+      broadcastCurrentState();
+    });
+    return () => unsub();
   }, [calledNumbers, currentNumber, selectedPatternId, winnerName, isGameFinished]);
 
   const handleCallNextNumber = () => {
@@ -57,6 +68,7 @@ export function BingoHostView({ teams, onEndGame, onReturnToHub }: BingoHostView
 
     const next = uncalled[Math.floor(Math.random() * uncalled.length)];
     soundManager.playPartyCue('bingoRoll');
+    hubSyncBus.broadcastSound('bingoRoll');
 
     setCurrentNumber(next);
     setCalledNumbers((prev) => [...prev, next]);
@@ -76,6 +88,7 @@ export function BingoHostView({ teams, onEndGame, onReturnToHub }: BingoHostView
     const isWin = checkBingoWin(card, selectedPatternId);
     if (isWin) {
       soundManager.playPartyCue('bingoWin');
+      hubSyncBus.broadcastSound('bingoWin');
       setWinnerName(card.playerName);
       setIsGameFinished(true);
     } else {

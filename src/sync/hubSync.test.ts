@@ -73,4 +73,25 @@ describe('HubSyncBus (Multi-Screen Synchronization)', () => {
 
     expect(onTimer).toHaveBeenCalledWith({ remaining: 45, running: true });
   });
+
+  it('handles canvas history and state caching', () => {
+    const onHistory = vi.fn();
+    bus.onCanvasHistory(onHistory);
+
+    const strokes = [
+      { x0: 0.1, y0: 0.2, x1: 0.3, y1: 0.4, color: '#000000', size: 2 },
+      { x0: 0.3, y0: 0.4, x1: 0.5, y1: 0.6, color: '#ff0000', size: 4 },
+    ];
+
+    bus.handleIncomingMessage({
+      type: 'CANVAS_HISTORY',
+      strokes,
+    });
+    expect(onHistory).toHaveBeenCalledWith(strokes);
+
+    // Test state caching
+    const triviaState = { gameId: 'family-trivia', score: 100 };
+    bus.broadcastState(triviaState);
+    expect(bus.getLastState('family-trivia')).toEqual(triviaState);
+  });
 });

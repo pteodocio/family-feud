@@ -12,6 +12,7 @@ export interface HubCanvasStroke {
 export type HubSyncMessage =
   | { type: 'HUB_STATE_UPDATE'; state: any }
   | { type: 'CANVAS_STROKE'; stroke: HubCanvasStroke }
+  | { type: 'CANVAS_HISTORY'; strokes: HubCanvasStroke[] }
   | { type: 'CANVAS_CLEAR' }
   | { type: 'TIMER_UPDATE'; timer: { remaining: number; running: boolean } }
   | { type: 'TRIGGER_SOUND'; cue: PartySoundCue }
@@ -22,8 +23,10 @@ export type HubSyncMessage =
 export class HubSyncBus {
   private channelName: string;
   private channel: BroadcastChannel | null = null;
+  private lastState: any = null;
   private onStateUpdateCallbacks: Set<(state: any) => void> = new Set();
   private onCanvasStrokeCallbacks: Set<(stroke: HubCanvasStroke) => void> = new Set();
+  private onCanvasHistoryCallbacks: Set<(strokes: HubCanvasStroke[]) => void> = new Set();
   private onCanvasClearCallbacks: Set<() => void> = new Set();
   private onTimerCallbacks: Set<(timer: { remaining: number; running: boolean }) => void> = new Set();
   private onSoundCallbacks: Set<(cue: PartySoundCue) => void> = new Set();
@@ -48,27 +51,61 @@ export class HubSyncBus {
 
     switch (msg.type) {
       case 'HUB_STATE_UPDATE':
+        this.lastState = msg.state;
+        try {
+          if (msg.state?.gameId && typeof window !== 'undefined') {
+            sessionStorage.setItem(`hub_last_state_${msg.state.gameId}`, JSON.stringify(msg.state));
+            sessionStorage.setItem('hub_active_game_id', msg.state.gameId);
+          }
+        } catch {}
         this.onStateUpdateCallbacks.forEach((cb) => cb(msg.state));
         break;
+
       case 'CANVAS_STROKE':
         this.onCanvasStrokeCallbacks.forEach((cb) => cb(msg.stroke));
         break;
+
+      case 'CANVAS_HISTORY':
+        this.onCanvasHistoryCallbacks.forEach((cb) => cb(msg.strokes));
+        break;
+
       case 'CANVAS_CLEAR':
         this.onCanvasClearCallbacks.forEach((cb) => cb());
         break;
+
       case 'TIMER_UPDATE':
         this.onTimerCallbacks.forEach((cb) => cb(msg.timer));
         break;
+
       case 'TRIGGER_SOUND':
         this.onSoundCallbacks.forEach((cb) => cb(msg.cue));
         break;
+
       case 'REQUEST_SYNC':
+        // Notify host listeners to re-broadcast
         this.onRequestSyncCallbacks.forEach((cb) => cb());
+        // Also automatically re-broadcast lastState if host listener hasn't already done so
+        if (this.lastState && this.channel) {
+          try {
+            this.channel.postMessage({
+              type: 'HUB_STATE_UPDATE',
+              state: this.lastState,
+            } as HubSyncMessage);
+          } catch {}
+        }
         break;
     }
   }
 
   public broadcastState(state: any) {
+    this.lastState = state;
+    try {
+      if (state?.gameId && typeof window !== 'undefined') {
+        sessionStorage.setItem(`hub_last_state_${state.gameId}`, JSON.stringify(state));
+        sessionStorage.setItem('hub_active_game_id', state.gameId);
+      }
+    } catch {}
+
     if (this.channel) {
       try {
         this.channel.postMessage({ type: 'HUB_STATE_UPDATE', state } as HubSyncMessage);
@@ -78,12 +115,38 @@ export class HubSyncBus {
     }
   }
 
+  public getLastState(gameId?: string): any {
+    if (this.lastState && (!gameId || this.lastState.gameId === gameId)) {
+      return this.lastState;
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        const targetId = gameId || sessionStorage.getItem('hub_active_game_id');
+        if (targetId) {
+          const raw = sessionStorage.getItem(`hub_last_state_${targetId}`);
+          if (raw) return JSON.parse(raw);
+        }
+      } catch {}
+    }
+    return null;
+  }
+
   public broadcastCanvasStroke(stroke: HubCanvasStroke) {
     if (this.channel) {
       try {
         this.channel.postMessage({ type: 'CANVAS_STROKE', stroke } as HubSyncMessage);
       } catch (err) {
         console.warn('Failed to broadcast stroke:', err);
+      }
+    }
+  }
+
+  public broadcastCanvasHistory(strokes: HubCanvasStroke[]) {
+    if (this.channel) {
+      try {
+        this.channel.postMessage({ type: 'CANVAS_HISTORY', strokes } as HubSyncMessage);
+      } catch (err) {
+        console.warn('Failed to broadcast canvas history:', err);
       }
     }
   }
@@ -141,6 +204,11 @@ export class HubSyncBus {
     return () => this.onCanvasStrokeCallbacks.delete(cb);
   }
 
+  public onCanvasHistory(cb: (strokes: HubCanvasStroke[]) => void): () => void {
+    this.onCanvasHistoryCallbacks.add(cb);
+    return () => this.onCanvasHistoryCallbacks.delete(cb);
+  }
+
   public onCanvasClear(cb: () => void): () => void {
     this.onCanvasClearCallbacks.add(cb);
     return () => this.onCanvasClearCallbacks.delete(cb);
@@ -170,6 +238,7 @@ export class HubSyncBus {
     }
     this.onStateUpdateCallbacks.clear();
     this.onCanvasStrokeCallbacks.clear();
+    this.onCanvasHistoryCallbacks.clear();
     this.onCanvasClearCallbacks.clear();
     this.onTimerCallbacks.clear();
     this.onSoundCallbacks.clear();

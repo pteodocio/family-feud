@@ -35,8 +35,8 @@ export function TriviaHostView({ teams: initialTeams, onEndGame, onReturnToHub }
 
   const currentQ = filteredQuestions[questionIndex % filteredQuestions.length];
 
-  // Broadcast state to TV display whenever state changes
-  useEffect(() => {
+  // Broadcast state to TV display whenever state changes or sync is requested
+  const broadcastCurrentState = () => {
     hubSyncBus.broadcastState({
       gameId: 'family-trivia',
       question: {
@@ -49,17 +49,31 @@ export function TriviaHostView({ teams: initialTeams, onEndGame, onReturnToHub }
       teams,
       isGameFinished,
     });
+  };
+
+  useEffect(() => {
+    broadcastCurrentState();
+  }, [currentQ, isAnswerRevealed, teams, isGameFinished]);
+
+  useEffect(() => {
+    const unsub = hubSyncBus.onRequestSync(() => {
+      broadcastCurrentState();
+    });
+    return () => unsub();
   }, [currentQ, isAnswerRevealed, teams, isGameFinished]);
 
   const handleRevealAnswer = () => {
     setIsAnswerRevealed(true);
     setTimerRunning(false);
+    hubSyncBus.broadcastTimer(0, false);
     soundManager.playPartyCue('correct');
+    hubSyncBus.broadcastSound('correct');
   };
 
   const handleNextQuestion = () => {
     setIsAnswerRevealed(false);
     setTimerRunning(false);
+    hubSyncBus.broadcastTimer(20, false);
     setQuestionIndex((prev) => prev + 1);
   };
 
@@ -68,6 +82,7 @@ export function TriviaHostView({ teams: initialTeams, onEndGame, onReturnToHub }
       prev.map((t) => (t.id === teamId ? { ...t, score: t.score + pts } : t))
     );
     soundManager.playPartyCue('correct');
+    hubSyncBus.broadcastSound('correct');
   };
 
   const handleAdjustScore = (teamId: string, delta: number) => {
@@ -129,7 +144,11 @@ export function TriviaHostView({ teams: initialTeams, onEndGame, onReturnToHub }
             <SharedTimer
               initialSeconds={20}
               isRunning={timerRunning}
-              onExpire={() => setTimerRunning(false)}
+              onTick={(sec) => hubSyncBus.broadcastTimer(sec, true)}
+              onExpire={() => {
+                setTimerRunning(false);
+                hubSyncBus.broadcastTimer(0, false);
+              }}
             />
           </div>
 
