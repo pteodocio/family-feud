@@ -1,5 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import type { GameSession, QuestionPack, GameConfig } from '../types/game';
+import type { HubPlayer, HubTeam, HubGameHistoryEntry } from '../types/hub';
 import { FILIPINO_BUILTIN_PACKS } from '../data/filipinoPacks';
 
 export interface AppSettings {
@@ -48,6 +49,9 @@ export class FeudDatabase extends Dexie {
   questionPacks!: Table<QuestionPack, string>;
   gameSessions!: Table<GameSession, string>;
   settings!: Table<AppSettings, string>;
+  players!: Table<HubPlayer, string>;
+  teams!: Table<HubTeam, string>;
+  gameHistory!: Table<HubGameHistoryEntry, string>;
 
   constructor() {
     super('FamilyFeudGameShowDB');
@@ -57,6 +61,12 @@ export class FeudDatabase extends Dexie {
       questionPacks: 'id, title, category, isBuiltIn, updatedAt',
       gameSessions: 'id, updatedAt, phase',
       settings: 'id',
+    });
+
+    this.version(2).stores({
+      players: 'id, name, teamId, createdAt',
+      teams: 'id, name, color, score',
+      gameHistory: 'id, gameId, gameTitle, datePlayed, winnerName',
     });
   }
 }
