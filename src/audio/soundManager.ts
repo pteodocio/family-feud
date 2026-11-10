@@ -1,4 +1,5 @@
 import type { SoundEffectName, BgmTrackName } from '../types/game';
+import { playProceduralPartyCue, type PartySoundCue } from './gameSounds';
 
 interface SoundConfig {
   file: string;
@@ -405,6 +406,17 @@ export class SoundManager {
           break;
       }
     } catch {}
+  }
+
+  /**
+   * Plays party game sound cues (tick, fanfare, bingo roll, etc.).
+   */
+  public playPartyCue(cue: PartySoundCue) {
+    if (this.isMuted || !this.effectsEnabled || this.masterVolume <= 0 || this.effectsVolume <= 0) {
+      return;
+    }
+    this.init();
+    playProceduralPartyCue(this.ctx, this.effectsGain, cue);
   }
 }
 
