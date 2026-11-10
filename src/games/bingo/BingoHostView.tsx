@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, RotateCcw, Award, CheckCircle2, Trophy, Eye } from 'lucide-react';
+import { Play, RotateCcw, Award, CheckCircle2 } from 'lucide-react';
 import {
   BINGO_PATTERNS,
   getBingoLetter,

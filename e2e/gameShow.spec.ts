@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Family Feud Game Show End-to-End Tests', () => {
   test('Main Menu loads correctly and navigates to Game Setup', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/#/feud');
 
     await expect(page.getByRole('heading', { name: 'FAMILY FEUD' })).toBeVisible();
     await expect(page.getByText('START NEW GAME')).toBeVisible();

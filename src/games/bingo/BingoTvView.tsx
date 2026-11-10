@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Trophy, Award, Sparkles } from 'lucide-react';
+import { Trophy } from 'lucide-react';
 import { hubSyncBus } from '../../sync/hubSync';
 import { getBingoLetter, type BingoPattern } from '../../data/hubData/bingoPatterns';
 

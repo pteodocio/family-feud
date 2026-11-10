@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, CheckCircle2, ArrowRight, Eye, Trophy, RotateCcw } from 'lucide-react';
+import { Play, CheckCircle2, ArrowRight, Eye, Trophy } from 'lucide-react';
 import { TRIVIA_QUESTIONS, TRIVIA_CATEGORIES } from '../../data/hubData/triviaQuestions';
 import { SharedTimer } from '../../components/shared/SharedTimer';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Play, RotateCcw, Shuffle, Eye, CheckCircle2, Trophy, HelpCircle } from 'lucide-react';
-import { WORD_CLUES, WORD_CLUE_CATEGORIES, type WordCluePuzzle } from '../../data/hubData/wordClues';
+import { Trophy } from 'lucide-react';
+import { WORD_CLUES, WORD_CLUE_CATEGORIES } from '../../data/hubData/wordClues';
 import { SharedTimer } from '../../components/shared/SharedTimer';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
 import { WinnerPodiumModal } from '../../components/shared/WinnerPodiumModal';

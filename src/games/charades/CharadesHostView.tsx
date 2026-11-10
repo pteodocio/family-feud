@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, RotateCcw, Shuffle, Eye, CheckCircle2, XCircle, Trophy } from 'lucide-react';
+import { Play, Shuffle, Eye, CheckCircle2 } from 'lucide-react';
 import { CHARADES_WORDS, CHARADES_CATEGORIES, type CharadesWord } from '../../data/hubData/charadesWords';
 import { SharedTimer } from '../../components/shared/SharedTimer';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';

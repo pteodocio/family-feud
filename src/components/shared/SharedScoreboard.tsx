@@ -85,7 +85,9 @@ export function SharedScoreboard({
                 {team.name}
               </span>
               {isLeader && (
-                <Trophy className="w-4 h-4 text-amber-400 shrink-0 animate-bounce" title="Current Leader" />
+                <span title="Current Leader">
+                  <Trophy className="w-4 h-4 text-amber-400 shrink-0 animate-bounce" />
+                </span>
               )}
             </div>
 

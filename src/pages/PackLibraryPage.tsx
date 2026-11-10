@@ -77,11 +77,13 @@ export function PackLibraryPage() {
       questions: [
         {
           id: `q_${Date.now()}_1`,
-          prompt: '',
+          prompt: 'Paboritong handa sa Pasko',
           category: 'Custom',
           answers: [
-            { id: `a_${Date.now()}_1`, text: '', points: 0, acceptedVariants: [], displayOrder: 1 },
-            { id: `a_${Date.now()}_2`, text: '', points: 0, acceptedVariants: [], displayOrder: 2 },
+            { id: `a_${Date.now()}_1`, text: 'Lechon', points: 40, acceptedVariants: [], displayOrder: 1 },
+            { id: `a_${Date.now()}_2`, text: 'Spaghetti', points: 30, acceptedVariants: [], displayOrder: 2 },
+            { id: `a_${Date.now()}_3`, text: 'Queso de Bola', points: 20, acceptedVariants: [], displayOrder: 3 },
+            { id: `a_${Date.now()}_4`, text: 'Ham', points: 10, acceptedVariants: [], displayOrder: 4 },
           ],
         },
       ],

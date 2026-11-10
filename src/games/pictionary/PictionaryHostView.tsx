@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Play, RotateCcw, Shuffle, Eye, CheckCircle2, Trophy, Pencil } from 'lucide-react';
+import { Shuffle, CheckCircle2 } from 'lucide-react';
 import { PICTIONARY_WORDS, PICTIONARY_CATEGORIES, type PictionaryWord } from '../../data/hubData/pictionaryWords';
 import { DrawingCanvas, type DrawingCanvasHandle } from '../../components/shared/DrawingCanvas';
 import { SharedTimer } from '../../components/shared/SharedTimer';

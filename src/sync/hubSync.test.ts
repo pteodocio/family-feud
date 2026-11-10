@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { HubSyncBus, type HubSyncMessage } from './hubSync';
+import { HubSyncBus } from './hubSync';
 
 describe('HubSyncBus (Multi-Screen Synchronization)', () => {
   let bus: HubSyncBus;

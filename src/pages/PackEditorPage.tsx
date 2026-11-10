@@ -268,6 +268,7 @@ export function PackEditorPage({ packId }: PackEditorPageProps) {
                   <textarea
                     rows={2}
                     value={currentQuestion.prompt}
+                    placeholder="e.g. Name something found in a kitchen..."
                     onChange={(e) => handleUpdatePrompt(e.target.value)}
                     className="w-full bg-black/60 border border-blue-700 rounded-xl p-3 text-white font-bold text-sm focus:outline-none focus:border-feud-gold"
                   />

@@ -4,14 +4,21 @@ import { initializeDatabase } from './db/database';
 import { useGameStore } from './store/gameStore';
 import { AudioInitializer } from './components/common/AudioInitializer';
 
-// Pages
+// Hub Pages
+import { MainHubPage } from './pages/MainHubPage';
+import { GameSetupHubPage } from './pages/GameSetupHubPage';
+import { HubHostPage } from './pages/HubHostPage';
+import { HubDisplayPage } from './pages/HubDisplayPage';
+import { GameHistoryPage } from './pages/GameHistoryPage';
+import { GlobalSettingsPage } from './pages/GlobalSettingsPage';
+
+// Feud Pages (Preserved 100%)
 import { MainMenuPage } from './pages/MainMenuPage';
 import { GameSetupPage } from './pages/GameSetupPage';
 import { HostConsolePage } from './pages/HostConsolePage';
 import { DisplayPage } from './pages/DisplayPage';
 import { PackLibraryPage } from './pages/PackLibraryPage';
 import { PackEditorPage } from './pages/PackEditorPage';
-import { SettingsPage } from './pages/SettingsPage';
 import { GameResultsPage } from './pages/GameResultsPage';
 
 function AppContent() {
@@ -24,8 +31,43 @@ function AppContent() {
     });
   }, [loadGlobalSettings]);
 
-  // Route Matching
-  if (currentPath === '/' || currentPath === '') {
+  // 1. Hub Homepage & Game Library
+  if (currentPath === '/' || currentPath === '' || currentPath === '/games') {
+    return <MainHubPage />;
+  }
+
+  // 2. Hub Game Setup: /games/:id/setup
+  const hubSetupMatch = matchPattern('/games/:id/setup', currentPath);
+  if (hubSetupMatch.matches) {
+    if (hubSetupMatch.params.id === 'family-feud') {
+      return <GameSetupPage />;
+    }
+    return <GameSetupHubPage gameId={hubSetupMatch.params.id} />;
+  }
+
+  // 3. Hub Host Runner: /games/:id/host
+  const hubHostMatch = matchPattern('/games/:id/host', currentPath);
+  if (hubHostMatch.matches) {
+    return <HubHostPage gameId={hubHostMatch.params.id} />;
+  }
+
+  // 4. Hub TV Display: /display/hub/:id
+  const hubDisplayMatch = matchPattern('/display/hub/:id', currentPath);
+  if (hubDisplayMatch.matches) {
+    return <HubDisplayPage gameId={hubDisplayMatch.params.id} />;
+  }
+
+  // 5. Game History & Global Settings
+  if (currentPath === '/history') {
+    return <GameHistoryPage />;
+  }
+
+  if (currentPath === '/settings') {
+    return <GlobalSettingsPage />;
+  }
+
+  // 6. Preserved Family Feud Routes
+  if (currentPath === '/feud') {
     return <MainMenuPage />;
   }
 
@@ -33,14 +75,14 @@ function AppContent() {
     return <GameSetupPage />;
   }
 
-  const hostMatch = matchPattern('/game/:id', currentPath);
-  if (hostMatch.matches) {
-    return <HostConsolePage gameId={hostMatch.params.id} />;
+  const feudHostMatch = matchPattern('/game/:id', currentPath);
+  if (feudHostMatch.matches) {
+    return <HostConsolePage gameId={feudHostMatch.params.id} />;
   }
 
-  const displayMatch = matchPattern('/display/:id', currentPath);
-  if (displayMatch.matches) {
-    return <DisplayPage gameId={displayMatch.params.id} />;
+  const feudDisplayMatch = matchPattern('/display/:id', currentPath);
+  if (feudDisplayMatch.matches) {
+    return <DisplayPage gameId={feudDisplayMatch.params.id} />;
   }
 
   if (currentPath === '/packs') {
@@ -52,17 +94,13 @@ function AppContent() {
     return <PackEditorPage packId={packEditMatch.params.id} />;
   }
 
-  if (currentPath === '/settings') {
-    return <SettingsPage />;
-  }
-
   const resultsMatch = matchPattern('/results/:id', currentPath);
   if (resultsMatch.matches) {
     return <GameResultsPage gameId={resultsMatch.params.id} />;
   }
 
-  // Fallback to Main Menu
-  return <MainMenuPage />;
+  // Fallback to Family Game Hub
+  return <MainHubPage />;
 }
 
 export default function App() {

@@ -1,4 +1,4 @@
-import type { GameCatalogItem, GameCatalogId } from '../types/hub';
+import type { GameCatalogItem } from '../types/hub';
 
 export const GAMES_CATALOG: GameCatalogItem[] = [
   {

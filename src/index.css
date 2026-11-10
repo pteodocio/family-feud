@@ -4,6 +4,27 @@
 
 :root {
   color-scheme: dark;
+  --hub-bg: #060b18;
+  --hub-surface: #0d172e;
+  --hub-surface-hover: #142346;
+  --hub-border: #1e293b;
+  --hub-text-main: #f8fafc;
+  --hub-text-muted: #94a3b8;
+  --color-feud: #ffd15c;
+  --color-trivia: #38bdf8;
+  --color-charades: #fb7185;
+  --color-pictionary: #34d399;
+  --color-bingo: #fbbf24;
+  --color-word: #a78bfa;
+}
+
+html, body {
+  overflow-x: clip;
+}
+
+:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
 }
 
 body {
