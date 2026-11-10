@@ -18,9 +18,8 @@ export function EliminationTvView() {
   const [state, setState] = useState<EliminationTvState | null>(() => {
     return hubSyncBus.getLastState('trivia-elimination');
   });
-  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean }>({
-    remaining: 30,
-    running: false,
+  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean }>(() => {
+    return hubSyncBus.getLastTimer() || { remaining: 30, running: false };
   });
 
   useEffect(() => {

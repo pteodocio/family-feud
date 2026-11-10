@@ -220,11 +220,12 @@ export function TriviaHostView({ teams: initialTeams, onEndGame, onReturnToHub }
 
             <SharedTimer
               initialSeconds={20}
+              resetKey={questionIndex}
               isRunning={timerRunning}
-              onTick={(sec) => hubSyncBus.broadcastTimer(sec, true)}
+              onToggle={() => setTimerRunning((prev) => !prev)}
+              onReset={() => setTimerRunning(false)}
               onExpire={() => {
                 setTimerRunning(false);
-                hubSyncBus.broadcastTimer(0, false);
               }}
             />
           </div>

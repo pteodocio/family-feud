@@ -128,6 +128,7 @@ export function ScattergoriesHostView({ teams: initialTeams, onEndGame, onReturn
         <div className="flex items-center gap-4">
           <SharedTimer
             initialSeconds={120}
+            resetKey={roundData.letter}
             isRunning={timerRunning}
             onExpire={() => {
               setTimerRunning(false);

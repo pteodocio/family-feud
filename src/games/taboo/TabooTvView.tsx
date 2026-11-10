@@ -17,9 +17,8 @@ export function TabooTvView() {
   const [state, setState] = useState<TabooTvState | null>(() => {
     return hubSyncBus.getLastState('taboo');
   });
-  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean }>({
-    remaining: 60,
-    running: false,
+  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean }>(() => {
+    return hubSyncBus.getLastTimer() || { remaining: 60, running: false };
   });
 
   useEffect(() => {

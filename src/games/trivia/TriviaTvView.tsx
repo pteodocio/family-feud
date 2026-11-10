@@ -20,9 +20,8 @@ export function TriviaTvView() {
   const [state, setState] = useState<TriviaTvState | null>(() => {
     return hubSyncBus.getLastState('family-trivia');
   });
-  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean }>({
-    remaining: 20,
-    running: false,
+  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean }>(() => {
+    return hubSyncBus.getLastTimer() || { remaining: 20, running: false };
   });
 
   useEffect(() => {

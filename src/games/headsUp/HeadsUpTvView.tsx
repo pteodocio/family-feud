@@ -19,9 +19,8 @@ export function HeadsUpTvView() {
   const [state, setState] = useState<HeadsUpTvState | null>(() => {
     return hubSyncBus.getLastState('heads-up');
   });
-  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean }>({
-    remaining: 60,
-    running: false,
+  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean }>(() => {
+    return hubSyncBus.getLastTimer() || { remaining: 60, running: false };
   });
 
   useEffect(() => {

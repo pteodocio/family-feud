@@ -113,6 +113,7 @@ export function HeadsUpHostView({ teams: initialTeams, onEndGame, onReturnToHub 
         <div className="flex items-center gap-4">
           <SharedTimer
             initialSeconds={60}
+            resetKey={activeTeamIdx}
             isRunning={timerRunning}
             onExpire={() => {
               setTimerRunning(false);

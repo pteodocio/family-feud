@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Shuffle, Eye, MessageSquareQuote } from 'lucide-react';
 import { generateProceduralBluff, type BluffItem } from '../../services/localGenerators/bluffGenerator';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
+import { SharedTimer } from '../../components/shared/SharedTimer';
 import { WinnerPodiumModal } from '../../components/shared/WinnerPodiumModal';
 import { hubSyncBus } from '../../sync/hubSync';
 import { soundManager } from '../../audio/soundManager';
@@ -36,6 +37,7 @@ export function BluffHostView({ teams: initialTeams, onEndGame, onReturnToHub }:
   const [isVotingActive, setIsVotingActive] = useState(false);
   const [isRevealed, setIsRevealed] = useState(false);
   const [isGameFinished, setIsGameFinished] = useState(false);
+  const [timerRunning, setTimerRunning] = useState(false);
 
   useEffect(() => {
     generateProceduralBluff({ count: 5 }).then((res) => {
@@ -157,6 +159,7 @@ export function BluffHostView({ teams: initialTeams, onEndGame, onReturnToHub }:
     setShuffledChoices([]);
     setIsVotingActive(false);
     setIsRevealed(false);
+    setTimerRunning(false);
   };
 
   return (
@@ -173,15 +176,30 @@ export function BluffHostView({ teams: initialTeams, onEndGame, onReturnToHub }:
           </div>
         </div>
 
-        <button
-          onClick={() => {
-            setIsGameFinished(true);
-            onEndGame(teams);
-          }}
-          className="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-bold transition-colors"
-        >
-          End Game
-        </button>
+        <div className="flex items-center gap-4">
+          <SharedTimer
+            initialSeconds={60}
+            resetKey={itemIdx}
+            isRunning={timerRunning}
+            onToggle={() => setTimerRunning((prev) => !prev)}
+            onReset={() => setTimerRunning(false)}
+            onExpire={() => {
+              setTimerRunning(false);
+              soundManager.playPartyCue('whistle');
+              hubSyncBus.broadcastSoundTrigger('whistle');
+            }}
+          />
+
+          <button
+            onClick={() => {
+              setIsGameFinished(true);
+              onEndGame(teams);
+            }}
+            className="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-bold transition-colors"
+          >
+            End Game
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

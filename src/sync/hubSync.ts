@@ -26,6 +26,7 @@ export class HubSyncBus {
   private channelName: string;
   private channel: BroadcastChannel | null = null;
   private lastState: any = null;
+  private lastTimer: { remaining: number; running: boolean } | null = null;
   private onStateUpdateCallbacks: Set<(state: any) => void> = new Set();
   private onCanvasStrokeCallbacks: Set<(stroke: HubCanvasStroke) => void> = new Set();
   private onCanvasHistoryCallbacks: Set<(strokes: HubCanvasStroke[]) => void> = new Set();
@@ -78,6 +79,12 @@ export class HubSyncBus {
         break;
 
       case 'TIMER_UPDATE':
+        this.lastTimer = msg.timer;
+        try {
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('hub_last_timer', JSON.stringify(msg.timer));
+          }
+        } catch {}
         this.onTimerCallbacks.forEach((cb) => cb(msg.timer));
         break;
 
@@ -98,12 +105,20 @@ export class HubSyncBus {
       case 'REQUEST_SYNC':
         // Notify host listeners to re-broadcast
         this.onRequestSyncCallbacks.forEach((cb) => cb());
-        // Also automatically re-broadcast lastState if host listener hasn't already done so
+        // Also automatically re-broadcast lastState and lastTimer if host listener hasn't already done so
         if (this.lastState && this.channel) {
           try {
             this.channel.postMessage({
               type: 'HUB_STATE_UPDATE',
               state: this.lastState,
+            } as HubSyncMessage);
+          } catch {}
+        }
+        if (this.lastTimer && this.channel) {
+          try {
+            this.channel.postMessage({
+              type: 'TIMER_UPDATE',
+              timer: this.lastTimer,
             } as HubSyncMessage);
           } catch {}
         }
@@ -180,6 +195,13 @@ export class HubSyncBus {
   }
 
   public broadcastTimer(remaining: number, running: boolean) {
+    this.lastTimer = { remaining, running };
+    try {
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('hub_last_timer', JSON.stringify(this.lastTimer));
+      }
+    } catch {}
+
     if (this.channel) {
       try {
         this.channel.postMessage({
@@ -190,6 +212,17 @@ export class HubSyncBus {
         console.warn('Failed to broadcast timer update:', err);
       }
     }
+  }
+
+  public getLastTimer(): { remaining: number; running: boolean } | null {
+    if (this.lastTimer) return this.lastTimer;
+    try {
+      if (typeof window !== 'undefined') {
+        const raw = sessionStorage.getItem('hub_last_timer');
+        if (raw) return JSON.parse(raw);
+      }
+    } catch {}
+    return null;
   }
 
   public broadcastSound(cue: PartySoundCue) {
@@ -237,6 +270,11 @@ export class HubSyncBus {
   }
 
   public onTimerUpdate(cb: (timer: { remaining: number; running: boolean }) => void): () => void {
+    if (this.lastTimer) {
+      try {
+        cb(this.lastTimer);
+      } catch {}
+    }
     this.onTimerCallbacks.add(cb);
     return () => this.onTimerCallbacks.delete(cb);
   }

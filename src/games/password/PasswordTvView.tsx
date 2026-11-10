@@ -21,9 +21,8 @@ export function PasswordTvView() {
   const [state, setState] = useState<PasswordTvState | null>(() => {
     return hubSyncBus.getLastState('password');
   });
-  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean }>({
-    remaining: 15,
-    running: false,
+  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean }>(() => {
+    return hubSyncBus.getLastTimer() || { remaining: 15, running: false };
   });
 
   useEffect(() => {

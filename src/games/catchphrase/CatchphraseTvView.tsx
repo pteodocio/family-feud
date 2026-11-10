@@ -17,9 +17,8 @@ export function CatchphraseTvView() {
   const [state, setState] = useState<CatchphraseTvState | null>(() => {
     return hubSyncBus.getLastState('catchphrase');
   });
-  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean }>({
-    remaining: 60,
-    running: false,
+  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean }>(() => {
+    return hubSyncBus.getLastTimer() || { remaining: 60, running: false };
   });
 
   useEffect(() => {

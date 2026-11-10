@@ -131,7 +131,7 @@ export function GuessWordHostView({ teams: initialTeams, onEndGame, onReturnToHu
     setIsWordRevealed(false);
     setRevealedClueCount(1);
     setTimerRunning(false);
-    hubSyncBus.broadcastTimer(45, false);
+    hubSyncBus.broadcastTimer(30, false);
     setPuzzleIndex((prev) => prev + 1);
   };
 
@@ -213,11 +213,12 @@ export function GuessWordHostView({ teams: initialTeams, onEndGame, onReturnToHu
               </span>
               <SharedTimer
                 initialSeconds={30}
+                resetKey={puzzleIndex}
                 isRunning={timerRunning}
-                onTick={(sec) => hubSyncBus.broadcastTimer(sec, true)}
+                onToggle={() => setTimerRunning((prev) => !prev)}
+                onReset={() => setTimerRunning(false)}
                 onExpire={() => {
                   setTimerRunning(false);
-                  hubSyncBus.broadcastTimer(0, false);
                 }}
               />
             </div>

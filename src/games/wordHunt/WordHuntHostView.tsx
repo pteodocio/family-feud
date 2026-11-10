@@ -129,6 +129,7 @@ export function WordHuntHostView({ teams: initialTeams, onEndGame, onReturnToHub
         <div className="flex items-center gap-4">
           <SharedTimer
             initialSeconds={90}
+            resetKey={grid.flat().join('')}
             isRunning={timerRunning}
             onExpire={() => {
               setTimerRunning(false);

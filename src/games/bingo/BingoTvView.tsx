@@ -16,16 +16,26 @@ export function BingoTvView() {
   const [state, setState] = useState<BingoTvState | null>(() => {
     return hubSyncBus.getLastState('family-bingo');
   });
+  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean } | null>(() => {
+    return hubSyncBus.getLastTimer();
+  });
 
   useEffect(() => {
-    const unsub = hubSyncBus.onStateUpdate((incoming) => {
+    const unsubState = hubSyncBus.onStateUpdate((incoming) => {
       if (incoming && incoming.gameId === 'family-bingo') {
         setState(incoming);
       }
     });
 
+    const unsubTimer = hubSyncBus.onTimerUpdate((timer) => {
+      setTimerState(timer);
+    });
+
     hubSyncBus.requestSync();
-    return () => unsub();
+    return () => {
+      unsubState();
+      unsubTimer();
+    };
   }, []);
 
   if (!state) {
@@ -50,6 +60,13 @@ export function BingoTvView() {
           <span className="text-xs sm:text-sm font-black uppercase tracking-widest text-amber-300 bg-amber-950/80 border border-amber-800 px-4 py-1.5 rounded-full shadow-lg">
             Pattern: {selectedPattern?.name || 'Standard Line'}
           </span>
+
+          {timerState && timerState.running && timerState.remaining > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-mono font-black text-xs">
+              <span className="text-[10px] uppercase text-amber-400">Next Ball:</span>
+              <span>{timerState.remaining}s</span>
+            </div>
+          )}
         </div>
 
         <div className="text-right">

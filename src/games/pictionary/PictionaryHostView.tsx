@@ -143,6 +143,12 @@ export function PictionaryHostView({ teams: initialTeams, onEndGame, onReturnToH
 
   const handleNextTurn = () => {
     setActiveTeamIndex((prev) => prev + 1);
+    setIsWordRevealedOnTv(false);
+    setTimerRunning(false);
+    strokesHistoryRef.current = [];
+    canvasRef.current?.clear();
+    hubSyncBus.broadcastCanvasClear();
+    hubSyncBus.broadcastTimer(60, false);
     pickRandomWord();
   };
 
@@ -224,11 +230,12 @@ export function PictionaryHostView({ teams: initialTeams, onEndGame, onReturnToH
         <div className="flex items-center gap-2">
           <SharedTimer
             initialSeconds={60}
+            resetKey={`${currentWord?.word}_${activeTeamIndex}`}
             isRunning={timerRunning}
-            onTick={(sec) => hubSyncBus.broadcastTimer(sec, true)}
+            onToggle={() => setTimerRunning((prev) => !prev)}
+            onReset={() => setTimerRunning(false)}
             onExpire={() => {
               setTimerRunning(false);
-              hubSyncBus.broadcastTimer(0, false);
             }}
           />
 

@@ -17,9 +17,8 @@ export function PictionaryTvView() {
   const [state, setState] = useState<PictionaryTvState | null>(() => {
     return hubSyncBus.getLastState('pictionary');
   });
-  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean }>({
-    remaining: 60,
-    running: false,
+  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean }>(() => {
+    return hubSyncBus.getLastTimer() || { remaining: 60, running: false };
   });
   const canvasRef = useRef<DrawingCanvasHandle | null>(null);
 

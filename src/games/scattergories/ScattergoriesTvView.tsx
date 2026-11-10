@@ -16,9 +16,8 @@ export function ScattergoriesTvView() {
   const [state, setState] = useState<ScattergoriesTvState | null>(() => {
     return hubSyncBus.getLastState('scattergories');
   });
-  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean }>({
-    remaining: 120,
-    running: false,
+  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean }>(() => {
+    return hubSyncBus.getLastTimer() || { remaining: 120, running: false };
   });
 
   useEffect(() => {

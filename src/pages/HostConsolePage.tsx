@@ -189,6 +189,13 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
     return () => clearInterval(interval);
   }, [fastMoneyTimer.running, tickFastMoneyTimer]);
 
+  // Clean up running Fast Money timer if host leaves or navigates away
+  useEffect(() => {
+    return () => {
+      pauseFastMoneyTimer();
+    };
+  }, [pauseFastMoneyTimer]);
+
   // Keyboard Shortcuts Handler (Disabled when typing in input/textarea)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

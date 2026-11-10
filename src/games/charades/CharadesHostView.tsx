@@ -147,6 +147,7 @@ export function CharadesHostView({ teams: initialTeams, onEndGame, onReturnToHub
   const handleNextTurn = () => {
     setActiveTeamIndex((prev) => prev + 1);
     setSkipsCount(0);
+    setTimerRunning(false);
     hubSyncBus.broadcastTimer(timerDuration, false);
     pickRandomWord();
   };
@@ -253,11 +254,12 @@ export function CharadesHostView({ teams: initialTeams, onEndGame, onReturnToHub
 
           <SharedTimer
             initialSeconds={timerDuration}
+            resetKey={`${currentWord?.word}_${activeTeamIndex}`}
             isRunning={timerRunning}
-            onTick={(sec) => hubSyncBus.broadcastTimer(sec, true)}
+            onToggle={() => setTimerRunning((prev) => !prev)}
+            onReset={() => setTimerRunning(false)}
             onExpire={() => {
               setTimerRunning(false);
-              hubSyncBus.broadcastTimer(0, false);
             }}
           />
         </div>

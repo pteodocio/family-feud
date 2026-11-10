@@ -18,9 +18,8 @@ export function CharadesTvView() {
   const [state, setState] = useState<CharadesTvState | null>(() => {
     return hubSyncBus.getLastState('charades');
   });
-  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean }>({
-    remaining: 60,
-    running: false,
+  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean }>(() => {
+    return hubSyncBus.getLastTimer() || { remaining: 60, running: false };
   });
 
   useEffect(() => {

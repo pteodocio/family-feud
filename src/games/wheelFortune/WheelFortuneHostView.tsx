@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { CheckCircle2, RotateCw, Sparkles } from 'lucide-react';
 import { generateProceduralWheel, type WheelPuzzle } from '../../services/localGenerators/wheelGenerator';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
+import { SharedTimer } from '../../components/shared/SharedTimer';
 import { WinnerPodiumModal } from '../../components/shared/WinnerPodiumModal';
 import { hubSyncBus } from '../../sync/hubSync';
 import { soundManager } from '../../audio/soundManager';
@@ -48,6 +49,7 @@ export function WheelFortuneHostView({ teams: initialTeams, onEndGame, onReturnT
   const [currentWedge, setCurrentWedge] = useState<string | null>(null);
   const [isSpinning, setIsSpinning] = useState(false);
   const [isGameFinished, setIsGameFinished] = useState(false);
+  const [timerRunning, setTimerRunning] = useState(false);
 
   useEffect(() => {
     generateProceduralWheel({ count: 5 }).then((res) => {
@@ -176,6 +178,20 @@ export function WheelFortuneHostView({ teams: initialTeams, onEndGame, onReturnT
         </div>
 
         <div className="flex items-center gap-4">
+          <SharedTimer
+            initialSeconds={30}
+            resetKey={`${puzzleIdx}_${activeTeamIdx}_${guessedLetters.length}`}
+            isRunning={timerRunning}
+            onToggle={() => setTimerRunning((prev) => !prev)}
+            onReset={() => setTimerRunning(false)}
+            onExpire={() => {
+              setTimerRunning(false);
+              soundManager.playPartyCue('wrong');
+              hubSyncBus.broadcastSoundTrigger('wrong');
+              setActiveTeamIdx((prev) => (prev + 1) % teams.length);
+            }}
+          />
+
           <div className="px-4 py-2 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 font-display font-black text-base flex items-center gap-1.5">
             <Sparkles className="w-4 h-4 text-amber-400" />
             <span>Round Pot: ${roundBank}</span>

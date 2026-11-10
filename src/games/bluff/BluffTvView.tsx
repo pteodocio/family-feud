@@ -27,6 +27,9 @@ export function BluffTvView() {
   const [state, setState] = useState<BluffTvState | null>(() => {
     return hubSyncBus.getLastState('bluff-the-answer');
   });
+  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean } | null>(() => {
+    return hubSyncBus.getLastTimer();
+  });
 
   useEffect(() => {
     const unsubState = hubSyncBus.onStateUpdate((incoming) => {
@@ -35,10 +38,15 @@ export function BluffTvView() {
       }
     });
 
+    const unsubTimer = hubSyncBus.onTimerUpdate((timer) => {
+      setTimerState(timer);
+    });
+
     hubSyncBus.requestSync();
 
     return () => {
       unsubState();
+      unsubTimer();
     };
   }, []);
 
@@ -57,7 +65,12 @@ export function BluffTvView() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col justify-between min-h-[85vh]">
       {/* Question Card */}
-      <div className="max-w-4xl mx-auto w-full p-8 sm:p-12 rounded-3xl bg-slate-900/90 border-2 border-purple-500/50 shadow-2xl text-center">
+      <div className="max-w-4xl mx-auto w-full p-8 sm:p-12 rounded-3xl bg-slate-900/90 border-2 border-purple-500/50 shadow-2xl text-center relative">
+        {timerState && timerState.running && timerState.remaining > 0 && (
+          <div className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/20 border border-purple-500/40 text-purple-300 font-mono font-black text-sm">
+            <span>{timerState.remaining}s</span>
+          </div>
+        )}
         <span className="text-xs font-black uppercase tracking-widest text-purple-400 block mb-3">
           Bizarre Trivia Challenge
         </span>

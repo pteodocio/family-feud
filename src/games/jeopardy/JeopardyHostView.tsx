@@ -115,6 +115,7 @@ export function JeopardyHostView({ teams: initialTeams, onEndGame, onReturnToHub
     }
     setActiveQuestion(null);
     setIsAnswerRevealed(false);
+    setTimerRunning(false);
   };
 
   if (!board) {
@@ -138,6 +139,7 @@ export function JeopardyHostView({ teams: initialTeams, onEndGame, onReturnToHub
         <div className="flex items-center gap-4">
           <SharedTimer
             initialSeconds={30}
+            resetKey={activeQuestion?.question?.id || 'grid'}
             isRunning={timerRunning}
             onExpire={() => {
               setTimerRunning(false);

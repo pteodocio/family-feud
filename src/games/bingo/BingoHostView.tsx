@@ -8,6 +8,7 @@ import {
   type BingoCard,
 } from '../../data/hubData/bingoPatterns';
 import { WinnerPodiumModal } from '../../components/shared/WinnerPodiumModal';
+import { SharedTimer } from '../../components/shared/SharedTimer';
 import { hubSyncBus } from '../../sync/hubSync';
 import { soundManager } from '../../audio/soundManager';
 import { recordContentUsage } from '../../services/contentHistory';
@@ -27,6 +28,7 @@ export function BingoHostView({ teams, onEndGame, onReturnToHub }: BingoHostView
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [winnerName, setWinnerName] = useState<string | null>(null);
   const [isGameFinished, setIsGameFinished] = useState(false);
+  const [autoCallRunning, setAutoCallRunning] = useState(false);
 
   // Initialize cards for participants (support dynamically generated cards)
   useEffect(() => {
@@ -182,6 +184,21 @@ export function BingoHostView({ teams, onEndGame, onReturnToHub }: BingoHostView
               </option>
             ))}
           </select>
+
+          <SharedTimer
+            initialSeconds={10}
+            resetKey={calledNumbers.length}
+            isRunning={autoCallRunning}
+            onToggle={() => setAutoCallRunning((prev) => !prev)}
+            onReset={() => setAutoCallRunning(false)}
+            onExpire={() => {
+              if (calledNumbers.length < 75) {
+                handleCallNextNumber();
+              } else {
+                setAutoCallRunning(false);
+              }
+            }}
+          />
 
           <button
             onClick={handleCallNextNumber}

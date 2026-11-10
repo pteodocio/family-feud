@@ -97,6 +97,7 @@ export function PasswordHostView({ teams: initialTeams, onEndGame, onReturnToHub
     setWordIndex((prev) => prev + 1);
     setClueCount(1);
     setIsRevealed(false);
+    setTimerRunning(false);
     setActiveTeamIdx((prev) => (prev + 1) % teams.length);
   };
 
@@ -121,14 +122,15 @@ export function PasswordHostView({ teams: initialTeams, onEndGame, onReturnToHub
         <div className="flex items-center gap-4">
           <SharedTimer
             initialSeconds={15}
+            resetKey={`${wordIndex}_${clueCount}`}
             isRunning={timerRunning}
+            onToggle={() => setTimerRunning((prev) => !prev)}
+            onReset={() => setTimerRunning(false)}
             onExpire={() => {
               setTimerRunning(false);
               soundManager.playPartyCue('whistle');
               hubSyncBus.broadcastSoundTrigger('whistle');
             }}
-            onToggle={() => setTimerRunning((prev) => !prev)}
-            onReset={() => setTimerRunning(false)}
           />
 
           <button

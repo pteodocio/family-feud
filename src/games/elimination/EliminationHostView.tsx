@@ -111,6 +111,7 @@ export function EliminationHostView({ teams: initialTeams, onEndGame, onReturnTo
     }
     setQIdx((prev) => prev + 1);
     setIsAnswerRevealed(false);
+    setTimerRunning(false);
   };
 
   return (
@@ -134,6 +135,7 @@ export function EliminationHostView({ teams: initialTeams, onEndGame, onReturnTo
         <div className="flex items-center gap-4">
           <SharedTimer
             initialSeconds={30}
+            resetKey={qIdx}
             isRunning={timerRunning}
             onExpire={() => {
               setTimerRunning(false);

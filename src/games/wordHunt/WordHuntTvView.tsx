@@ -16,9 +16,8 @@ export function WordHuntTvView() {
   const [state, setState] = useState<WordHuntTvState | null>(() => {
     return hubSyncBus.getLastState('word-hunt');
   });
-  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean }>({
-    remaining: 90,
-    running: false,
+  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean }>(() => {
+    return hubSyncBus.getLastTimer() || { remaining: 90, running: false };
   });
 
   useEffect(() => {

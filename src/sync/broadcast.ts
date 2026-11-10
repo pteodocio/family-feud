@@ -4,6 +4,7 @@ const CHANNEL_NAME = 'family-feud-sync-v1';
 
 class SyncBus {
   private channel: BroadcastChannel | null = null;
+  private lastTimer: { remaining: number; running: boolean } | null = null;
   private onStateUpdateCallbacks: Set<(session: GameSession) => void> = new Set();
   private onSoundCallbacks: Set<(sound: SoundEffectName, id?: string, timestamp?: number) => void> = new Set();
   private onBgmCallbacks: Set<(bgm: { track: BgmTrackName; action: 'play' | 'stop' | 'pause' }) => void> = new Set();
@@ -149,6 +150,7 @@ class SyncBus {
   }
 
   public broadcastTimer(remaining: number, running: boolean) {
+    this.lastTimer = { remaining, running };
     if (this.channel) {
       try {
         this.channel.postMessage({ type: 'TIMER_UPDATE', remaining, running } as SyncMessage);
@@ -156,6 +158,10 @@ class SyncBus {
         console.warn('Failed to broadcast timer update:', err);
       }
     }
+  }
+
+  public getLastTimer(): { remaining: number; running: boolean } | null {
+    return this.lastTimer;
   }
 
   public subscribeState(callback: (session: GameSession) => void): () => void {
@@ -199,6 +205,11 @@ class SyncBus {
   }
 
   public subscribeTimer(callback: (timer: { remaining: number; running: boolean }) => void): () => void {
+    if (this.lastTimer) {
+      try {
+        callback(this.lastTimer);
+      } catch {}
+    }
     this.onTimerCallbacks.add(callback);
     return () => this.onTimerCallbacks.delete(callback);
   }

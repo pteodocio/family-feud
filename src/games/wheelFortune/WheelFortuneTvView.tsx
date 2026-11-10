@@ -21,6 +21,9 @@ export function WheelFortuneTvView() {
   const [state, setState] = useState<WheelTvState | null>(() => {
     return hubSyncBus.getLastState('wheel-of-fortune');
   });
+  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean } | null>(() => {
+    return hubSyncBus.getLastTimer();
+  });
 
   useEffect(() => {
     const unsubState = hubSyncBus.onStateUpdate((incoming) => {
@@ -29,10 +32,15 @@ export function WheelFortuneTvView() {
       }
     });
 
+    const unsubTimer = hubSyncBus.onTimerUpdate((timer) => {
+      setTimerState(timer);
+    });
+
     hubSyncBus.requestSync();
 
     return () => {
       unsubState();
+      unsubTimer();
     };
   }, []);
 
@@ -66,6 +74,13 @@ export function WheelFortuneTvView() {
         </div>
 
         <div className="flex items-center gap-4">
+          {timerState && timerState.running && timerState.remaining > 0 && (
+            <div className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-300 font-mono font-black text-lg">
+              <span className="text-xs uppercase text-amber-400">Shot Clock:</span>
+              <span>{timerState.remaining}s</span>
+            </div>
+          )}
+
           <div className="flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 font-display font-black text-xl">
             <Sparkles className="w-5 h-5 text-amber-400" />
             <span>Round Pot: ${state.roundBank}</span>

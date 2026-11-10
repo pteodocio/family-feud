@@ -31,9 +31,8 @@ export function JeopardyTvView() {
   const [state, setState] = useState<JeopardyTvState | null>(() => {
     return hubSyncBus.getLastState('jeopardy');
   });
-  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean }>({
-    remaining: 30,
-    running: false,
+  const [timerState, setTimerState] = useState<{ remaining: number; running: boolean }>(() => {
+    return hubSyncBus.getLastTimer() || { remaining: 30, running: false };
   });
 
   useEffect(() => {

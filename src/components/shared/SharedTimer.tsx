@@ -1,8 +1,9 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Play, Pause, RotateCcw, Volume2, VolumeX } from 'lucide-react';
 import { soundManager } from '../../audio/soundManager';
+import { hubSyncBus } from '../../sync/hubSync';
 
-interface SharedTimerProps {
+export interface SharedTimerProps {
   initialSeconds: number;
   isRunning?: boolean;
   onTick?: (remaining: number) => void;
@@ -12,6 +13,8 @@ interface SharedTimerProps {
   showControls?: boolean;
   autoStart?: boolean;
   enableAudioTicks?: boolean;
+  broadcastOnHub?: boolean;
+  resetKey?: any;
   className?: string;
   size?: 'normal' | 'large';
 }
@@ -21,62 +24,157 @@ export function SharedTimer({
   isRunning: externalIsRunning,
   onTick,
   onExpire,
+  onToggle,
+  onReset,
   showControls = true,
   autoStart = false,
   enableAudioTicks = true,
+  broadcastOnHub = true,
+  resetKey,
   className = '',
   size = 'normal',
 }: SharedTimerProps) {
   const [remaining, setRemaining] = useState(initialSeconds);
   const [internalRunning, setInternalRunning] = useState(autoStart);
   const [audioEnabled, setAudioEnabled] = useState(enableAudioTicks);
-  const hasExpiredRef = useRef(false);
 
   const running = externalIsRunning !== undefined ? externalIsRunning : internalRunning;
 
-  useEffect(() => {
-    setRemaining(initialSeconds);
-    hasExpiredRef.current = false;
-  }, [initialSeconds]);
+  // Refs for drift-free timestamp calculation and avoiding duplicate calls
+  const remainingRef = useRef(initialSeconds);
+  const targetEndTimeRef = useRef<number>(0);
+  const intervalRef = useRef<any>(null);
+  const hasExpiredRef = useRef(false);
+  const lastEmittedSecRef = useRef<number>(initialSeconds);
+  const prevRunningRef = useRef(running);
+  const prevResetKeyRef = useRef(resetKey);
+  const prevInitialSecondsRef = useRef(initialSeconds);
 
-  useEffect(() => {
-    if (!running) return;
+  // Sync remaining state to ref
+  remainingRef.current = remaining;
 
-    const interval = setInterval(() => {
-      setRemaining((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          if (!hasExpiredRef.current) {
-            hasExpiredRef.current = true;
-            if (audioEnabled) {
-              soundManager.playPartyCue('whistle');
-            }
-            onExpire?.();
+  const broadcastTimerState = useCallback(
+    (sec: number, isRun: boolean) => {
+      if (broadcastOnHub) {
+        hubSyncBus.broadcastTimer(sec, isRun);
+      }
+    },
+    [broadcastOnHub]
+  );
+
+  // Handle resetKey or initialSeconds change
+  useEffect(() => {
+    const isResetKeyChanged = prevResetKeyRef.current !== resetKey;
+    const isInitialSecChanged = prevInitialSecondsRef.current !== initialSeconds;
+
+    if (isResetKeyChanged || isInitialSecChanged) {
+      prevResetKeyRef.current = resetKey;
+      prevInitialSecondsRef.current = initialSeconds;
+
+      hasExpiredRef.current = false;
+      lastEmittedSecRef.current = initialSeconds;
+      remainingRef.current = initialSeconds;
+      setRemaining(initialSeconds);
+
+      if (running) {
+        targetEndTimeRef.current = Date.now() + initialSeconds * 1000;
+        broadcastTimerState(initialSeconds, true);
+      } else {
+        broadcastTimerState(initialSeconds, false);
+      }
+    }
+  }, [resetKey, initialSeconds, running, broadcastTimerState]);
+
+  // Handle Timer Engine Interval with Date.now() drift compensation
+  useEffect(() => {
+    // If transitioning from stopped to running
+    if (running) {
+      // Calculate or re-anchor target end time based on current remaining
+      const currentRemaining = remainingRef.current > 0 ? remainingRef.current : initialSeconds;
+      targetEndTimeRef.current = Date.now() + currentRemaining * 1000;
+      hasExpiredRef.current = false;
+
+      // Broadcast running start if state changed
+      if (!prevRunningRef.current) {
+        broadcastTimerState(currentRemaining, true);
+      }
+
+      // High-frequency polling (100ms) for drift-free second updates
+      intervalRef.current = setInterval(() => {
+        const now = Date.now();
+        const diffMs = targetEndTimeRef.current - now;
+        const secondsLeft = Math.max(0, Math.ceil(diffMs / 1000));
+
+        if (secondsLeft !== lastEmittedSecRef.current) {
+          lastEmittedSecRef.current = secondsLeft;
+          remainingRef.current = secondsLeft;
+          setRemaining(secondsLeft);
+          onTick?.(secondsLeft);
+          broadcastTimerState(secondsLeft, true);
+
+          if (audioEnabled && secondsLeft <= 5 && secondsLeft > 0) {
+            soundManager.playPartyCue('tick');
           }
-          return 0;
-        }
 
-        const next = prev - 1;
-        if (audioEnabled && next <= 5) {
-          soundManager.playPartyCue('tick');
+          if (secondsLeft <= 0) {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            if (!hasExpiredRef.current) {
+              hasExpiredRef.current = true;
+              if (audioEnabled) {
+                soundManager.playPartyCue('whistle');
+              }
+              broadcastTimerState(0, false);
+              onExpire?.();
+            }
+          }
         }
-        onTick?.(next);
-        return next;
-      });
-    }, 1000);
+      }, 100);
+    } else {
+      // If transitioning from running to paused/stopped
+      if (prevRunningRef.current && remainingRef.current > 0) {
+        broadcastTimerState(remainingRef.current, false);
+      }
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }
 
-    return () => clearInterval(interval);
-  }, [running, audioEnabled, onExpire, onTick]);
+    prevRunningRef.current = running;
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [running, initialSeconds, audioEnabled, onExpire, onTick, broadcastTimerState]);
 
   const toggleRun = () => {
-    setInternalRunning((prev) => !prev);
+    if (onToggle) {
+      onToggle();
+    } else {
+      setInternalRunning((prev) => !prev);
+    }
   };
 
   const handleReset = () => {
-    setInternalRunning(false);
-    setRemaining(initialSeconds);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
     hasExpiredRef.current = false;
+    lastEmittedSecRef.current = initialSeconds;
+    remainingRef.current = initialSeconds;
+    setRemaining(initialSeconds);
+
+    if (externalIsRunning === undefined) {
+      setInternalRunning(false);
+    }
+
+    broadcastTimerState(initialSeconds, false);
     onTick?.(initialSeconds);
+    onReset?.();
   };
 
   const mins = Math.floor(remaining / 60);
@@ -104,10 +202,11 @@ export function SharedTimer({
         {formattedTime}
       </div>
 
-      {/* Optional Interactive Controls */}
+      {/* Interactive Controls */}
       {showControls && (
         <div className="flex items-center gap-1.5 ml-auto">
           <button
+            type="button"
             onClick={toggleRun}
             className={`p-2 rounded-xl text-xs font-bold transition-all focus-visible:outline-2 ${
               running
@@ -120,6 +219,7 @@ export function SharedTimer({
           </button>
 
           <button
+            type="button"
             onClick={handleReset}
             className="p-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors focus-visible:outline-2"
             title="Reset Timer"
@@ -128,6 +228,7 @@ export function SharedTimer({
           </button>
 
           <button
+            type="button"
             onClick={() => setAudioEnabled((prev) => !prev)}
             className={`p-2 rounded-xl text-xs font-bold border transition-colors focus-visible:outline-2 ${
               audioEnabled
