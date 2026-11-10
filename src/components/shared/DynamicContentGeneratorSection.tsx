@@ -18,6 +18,16 @@ import {
   regenerateSingleCharadesItem,
   regenerateSinglePictionaryItem,
   regenerateSingleGuessWordItem,
+  generatePasswordContent,
+  generateCatchphraseContent,
+  generateTabooContent,
+  generateJeopardyContent,
+  generateWheelContent,
+  generateBluffContent,
+  generateHeadsUpContent,
+  generateWordHuntContent,
+  generateScattergoriesContent,
+  generateEliminationContent,
   getEngineStatus,
   clearContentHistory,
   type EngineStatus,
@@ -79,6 +89,26 @@ export function DynamicContentGeneratorSection({
         return [...BINGO_THEMES];
       case 'guess-the-word':
         return ['All', 'Everyday Objects', 'Animals & Nature', 'Food & Snacks', 'Famous Places & Geography', 'Professions & Roles', 'Philippine Culture & Traditions', 'Science & Technology'];
+      case 'password':
+        return ['All', 'Pinoy Culture', 'Pinoy Food', 'Nature', 'Animals', 'Professions', 'Everyday Life'];
+      case 'catchphrase':
+        return ['All', 'Sayings', 'Pop Culture', 'Everyday Life', 'Pinoy Sayings', 'Pinoy Culture'];
+      case 'taboo':
+        return ['All', 'Pinoy Culture', 'Pinoy Food', 'Travel', 'Celebration', 'Technology'];
+      case 'jeopardy':
+        return ['All', 'TV Quiz Championship'];
+      case 'wheel-of-fortune':
+        return ['All', 'Pinoy Habit', 'Food & Drink', 'Travel', 'Movie Quote', 'Everyday Reality'];
+      case 'bluff-the-answer':
+        return ['All', 'Bizarre Real Trivia'];
+      case 'heads-up':
+        return ['All', 'Movies & Characters', 'Celebrities', 'Pinoy Celebrities', 'Animals', 'Actions'];
+      case 'word-hunt':
+        return ['All', '4x4 Boggle Board'];
+      case 'scattergories':
+        return ['All', 'General & Pinoy Mix'];
+      case 'trivia-elimination':
+        return ['All', 'Survival Science & History'];
       default:
         return ['All'];
     }
@@ -145,6 +175,56 @@ export function DynamicContentGeneratorSection({
         setGeneratedItems(res.puzzles);
         setGenerationSource(res.source);
         onContentReady(res.puzzles);
+      } else if (gameId === 'password') {
+        const res = await generatePasswordContent({ count: itemCount, category: category === 'All' ? undefined : category });
+        setGeneratedItems(res.words);
+        setGenerationSource(res.source);
+        onContentReady(res.words);
+      } else if (gameId === 'catchphrase') {
+        const res = await generateCatchphraseContent({ count: itemCount, category: category === 'All' ? undefined : category });
+        setGeneratedItems(res.phrases);
+        setGenerationSource(res.source);
+        onContentReady(res.phrases);
+      } else if (gameId === 'taboo') {
+        const res = await generateTabooContent({ count: itemCount, category: category === 'All' ? undefined : category });
+        setGeneratedItems(res.cards);
+        setGenerationSource(res.source);
+        onContentReady(res.cards);
+      } else if (gameId === 'jeopardy') {
+        const res = await generateJeopardyContent();
+        setGeneratedItems(res.categories);
+        setGenerationSource('local');
+        onContentReady(res.categories);
+      } else if (gameId === 'wheel-of-fortune') {
+        const res = await generateWheelContent({ count: itemCount, category: category === 'All' ? undefined : category });
+        setGeneratedItems(res.puzzles);
+        setGenerationSource(res.source);
+        onContentReady(res.puzzles);
+      } else if (gameId === 'bluff-the-answer') {
+        const res = await generateBluffContent({ count: itemCount });
+        setGeneratedItems(res.items);
+        setGenerationSource(res.source);
+        onContentReady(res.items);
+      } else if (gameId === 'heads-up') {
+        const res = await generateHeadsUpContent({ count: itemCount, category: category === 'All' ? undefined : category });
+        setGeneratedItems(res.cards);
+        setGenerationSource(res.source);
+        onContentReady(res.cards);
+      } else if (gameId === 'word-hunt') {
+        const res = await generateWordHuntContent();
+        setGeneratedItems([res]);
+        setGenerationSource('local');
+        onContentReady([res]);
+      } else if (gameId === 'scattergories') {
+        const res = await generateScattergoriesContent();
+        setGeneratedItems(res.categories.map((c) => ({ letter: res.letter, category: c })));
+        setGenerationSource('local');
+        onContentReady(res.categories);
+      } else if (gameId === 'trivia-elimination') {
+        const res = await generateEliminationContent({ count: itemCount });
+        setGeneratedItems(res.questions);
+        setGenerationSource(res.source);
+        onContentReady(res.questions);
       }
 
       await loadStatus();

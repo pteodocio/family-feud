@@ -10,6 +10,7 @@ interface WinnerPodiumModalProps {
   participants: ScoreboardParticipant[];
   onPlayAgain: () => void;
   onReturnToHub: () => void;
+  onClose?: () => void;
 }
 
 export function WinnerPodiumModal({

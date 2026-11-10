@@ -6,6 +6,16 @@ import { CharadesHostView } from '../games/charades/CharadesHostView';
 import { PictionaryHostView } from '../games/pictionary/PictionaryHostView';
 import { BingoHostView } from '../games/bingo/BingoHostView';
 import { GuessWordHostView } from '../games/guessWord/GuessWordHostView';
+import { PasswordHostView } from '../games/password/PasswordHostView';
+import { CatchphraseHostView } from '../games/catchphrase/CatchphraseHostView';
+import { TabooHostView } from '../games/taboo/TabooHostView';
+import { JeopardyHostView } from '../games/jeopardy/JeopardyHostView';
+import { WheelFortuneHostView } from '../games/wheelFortune/WheelFortuneHostView';
+import { BluffHostView } from '../games/bluff/BluffHostView';
+import { HeadsUpHostView } from '../games/headsUp/HeadsUpHostView';
+import { WordHuntHostView } from '../games/wordHunt/WordHuntHostView';
+import { ScattergoriesHostView } from '../games/scattergories/ScattergoriesHostView';
+import { EliminationHostView } from '../games/elimination/EliminationHostView';
 import { recordGameHistory } from '../db/hubDatabase';
 import { getGameById } from '../games/registry';
 import { hubSyncBus } from '../sync/hubSync';
@@ -191,6 +201,76 @@ export function HubHostPage({ gameId }: HubHostPageProps) {
         )}
         {gameId === 'guess-the-word' && (
           <GuessWordHostView
+            teams={participants}
+            onEndGame={handleEndGame}
+            onReturnToHub={() => navigate('/')}
+          />
+        )}
+        {gameId === 'password' && (
+          <PasswordHostView
+            teams={participants}
+            onEndGame={handleEndGame}
+            onReturnToHub={() => navigate('/')}
+          />
+        )}
+        {gameId === 'catchphrase' && (
+          <CatchphraseHostView
+            teams={participants}
+            onEndGame={handleEndGame}
+            onReturnToHub={() => navigate('/')}
+          />
+        )}
+        {gameId === 'taboo' && (
+          <TabooHostView
+            teams={participants}
+            onEndGame={handleEndGame}
+            onReturnToHub={() => navigate('/')}
+          />
+        )}
+        {gameId === 'jeopardy' && (
+          <JeopardyHostView
+            teams={participants}
+            onEndGame={handleEndGame}
+            onReturnToHub={() => navigate('/')}
+          />
+        )}
+        {gameId === 'wheel-of-fortune' && (
+          <WheelFortuneHostView
+            teams={participants}
+            onEndGame={handleEndGame}
+            onReturnToHub={() => navigate('/')}
+          />
+        )}
+        {gameId === 'bluff-the-answer' && (
+          <BluffHostView
+            teams={participants}
+            onEndGame={handleEndGame}
+            onReturnToHub={() => navigate('/')}
+          />
+        )}
+        {gameId === 'heads-up' && (
+          <HeadsUpHostView
+            teams={participants}
+            onEndGame={handleEndGame}
+            onReturnToHub={() => navigate('/')}
+          />
+        )}
+        {gameId === 'word-hunt' && (
+          <WordHuntHostView
+            teams={participants}
+            onEndGame={handleEndGame}
+            onReturnToHub={() => navigate('/')}
+          />
+        )}
+        {gameId === 'scattergories' && (
+          <ScattergoriesHostView
+            teams={participants}
+            onEndGame={handleEndGame}
+            onReturnToHub={() => navigate('/')}
+          />
+        )}
+        {gameId === 'trivia-elimination' && (
+          <EliminationHostView
             teams={participants}
             onEndGame={handleEndGame}
             onReturnToHub={() => navigate('/')}

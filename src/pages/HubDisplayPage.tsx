@@ -5,6 +5,16 @@ import { CharadesTvView } from '../games/charades/CharadesTvView';
 import { PictionaryTvView } from '../games/pictionary/PictionaryTvView';
 import { BingoTvView } from '../games/bingo/BingoTvView';
 import { GuessWordTvView } from '../games/guessWord/GuessWordTvView';
+import { PasswordTvView } from '../games/password/PasswordTvView';
+import { CatchphraseTvView } from '../games/catchphrase/CatchphraseTvView';
+import { TabooTvView } from '../games/taboo/TabooTvView';
+import { JeopardyTvView } from '../games/jeopardy/JeopardyTvView';
+import { WheelFortuneTvView } from '../games/wheelFortune/WheelFortuneTvView';
+import { BluffTvView } from '../games/bluff/BluffTvView';
+import { HeadsUpTvView } from '../games/headsUp/HeadsUpTvView';
+import { WordHuntTvView } from '../games/wordHunt/WordHuntTvView';
+import { ScattergoriesTvView } from '../games/scattergories/ScattergoriesTvView';
+import { EliminationTvView } from '../games/elimination/EliminationTvView';
 import { soundManager } from '../audio/soundManager';
 import { hubSyncBus } from '../sync/hubSync';
 import { loadSettings } from '../db/database';
@@ -135,6 +145,16 @@ export function HubDisplayPage({ gameId: initialGameId }: HubDisplayPageProps) {
       {activeGameId === 'pictionary' && <PictionaryTvView />}
       {activeGameId === 'family-bingo' && <BingoTvView />}
       {activeGameId === 'guess-the-word' && <GuessWordTvView />}
+      {activeGameId === 'password' && <PasswordTvView />}
+      {activeGameId === 'catchphrase' && <CatchphraseTvView />}
+      {activeGameId === 'taboo' && <TabooTvView />}
+      {activeGameId === 'jeopardy' && <JeopardyTvView />}
+      {activeGameId === 'wheel-of-fortune' && <WheelFortuneTvView />}
+      {activeGameId === 'bluff-the-answer' && <BluffTvView />}
+      {activeGameId === 'heads-up' && <HeadsUpTvView />}
+      {activeGameId === 'word-hunt' && <WordHuntTvView />}
+      {activeGameId === 'scattergories' && <ScattergoriesTvView />}
+      {activeGameId === 'trivia-elimination' && <EliminationTvView />}
     </div>
   );
 }

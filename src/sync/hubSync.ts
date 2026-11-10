@@ -129,6 +129,10 @@ export class HubSyncBus {
     }
   }
 
+  public broadcastStateUpdate(state: any) {
+    this.broadcastState(state);
+  }
+
   public getLastState(gameId?: string): any {
     if (this.lastState && (!gameId || this.lastState.gameId === gameId)) {
       return this.lastState;
@@ -196,6 +200,10 @@ export class HubSyncBus {
         console.warn('Failed to broadcast sound cue:', err);
       }
     }
+  }
+
+  public broadcastSoundTrigger(cue: any) {
+    this.broadcastSound(cue);
   }
 
   public requestSync() {

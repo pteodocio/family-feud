@@ -8,10 +8,13 @@ export interface ScoreboardParticipant {
 }
 
 interface SharedScoreboardProps {
-  teams: ScoreboardParticipant[];
+  teams?: ScoreboardParticipant[];
+  participants?: ScoreboardParticipant[];
   activeTeamId?: string | null;
   onAdjustScore?: (id: string, delta: number) => void;
+  onUpdateScore?: (id: string, newScore: number) => void;
   showControls?: boolean;
+  isTvView?: boolean;
   className?: string;
 }
 
@@ -56,16 +59,19 @@ const COLOR_CLASSES: Record<string, { border: string; bg: string; text: string; 
 
 export function SharedScoreboard({
   teams,
+  participants,
   activeTeamId,
   onAdjustScore,
+  onUpdateScore,
   showControls = false,
   className = '',
 }: SharedScoreboardProps) {
-  const maxScore = Math.max(...teams.map((t) => t.score), 0);
+  const list = teams || participants || [];
+  const maxScore = Math.max(...list.map((t) => t.score), 0);
 
   return (
     <div className={`grid grid-cols-2 sm:grid-cols-4 gap-3 w-full ${className}`}>
-      {teams.map((team) => {
+      {list.map((team) => {
         const c = COLOR_CLASSES[team.color || 'blue'] || COLOR_CLASSES.blue;
         const isActive = activeTeamId === team.id;
         const isLeader = team.score > 0 && team.score === maxScore;
@@ -97,17 +103,23 @@ export function SharedScoreboard({
             </div>
 
             {/* Score adjust controls (Host Console only) */}
-            {showControls && onAdjustScore && (
+            {showControls && (onAdjustScore || onUpdateScore) && (
               <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-800/80">
                 <button
-                  onClick={() => onAdjustScore(team.id, -10)}
+                  onClick={() => {
+                    if (onAdjustScore) onAdjustScore(team.id, -10);
+                    else if (onUpdateScore) onUpdateScore(team.id, team.score - 10);
+                  }}
                   className="flex-1 flex items-center justify-center p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors"
                   title="Minus 10 points"
                 >
                   <Minus className="w-3.5 h-3.5" />
                 </button>
                 <button
-                  onClick={() => onAdjustScore(team.id, 10)}
+                  onClick={() => {
+                    if (onAdjustScore) onAdjustScore(team.id, 10);
+                    else if (onUpdateScore) onUpdateScore(team.id, team.score + 10);
+                  }}
                   className="flex-1 flex items-center justify-center p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors"
                   title="Add 10 points"
                 >

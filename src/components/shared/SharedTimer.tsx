@@ -7,6 +7,8 @@ interface SharedTimerProps {
   isRunning?: boolean;
   onTick?: (remaining: number) => void;
   onExpire?: () => void;
+  onToggle?: () => void;
+  onReset?: () => void;
   showControls?: boolean;
   autoStart?: boolean;
   enableAudioTicks?: boolean;

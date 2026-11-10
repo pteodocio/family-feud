@@ -6,7 +6,9 @@ export type PartySoundCue =
   | 'bingoRoll'
   | 'bingoWin'
   | 'whistle'
-  | 'drumroll';
+  | 'drumroll'
+  | 'strike'
+  | 'round_win';
 
 /**
  * Synthesizes procedural Web Audio sound cues for party games.
@@ -58,7 +60,8 @@ export function playProceduralPartyCue(
         break;
       }
 
-      case 'wrong': {
+      case 'wrong':
+      case 'strike': {
         // Low dissonant buzzer
         const osc1 = ctx.createOscillator();
         const osc2 = ctx.createOscillator();
@@ -80,6 +83,7 @@ export function playProceduralPartyCue(
       }
 
       case 'fanfare':
+      case 'round_win':
       case 'bingoWin': {
         // Grand celebratory fanfare: C4, G4, C5, E5, G5 sustained
         const chords = [
