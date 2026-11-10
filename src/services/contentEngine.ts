@@ -10,6 +10,16 @@ import { generateProceduralCharades } from './localGenerators/charadesGenerator'
 import { generateProceduralPictionary } from './localGenerators/pictionaryGenerator';
 import { generateBingoCards, type GeneratedBingoCard } from './localGenerators/bingoGenerator';
 import { generateProceduralGuessWord } from './localGenerators/guessWordGenerator';
+import { generateProceduralPassword, type PasswordItem } from './localGenerators/passwordGenerator';
+import { generateProceduralCatchphrase, type CatchphraseItem } from './localGenerators/catchphraseGenerator';
+import { generateProceduralTaboo, type TabooCard } from './localGenerators/tabooGenerator';
+import { generateProceduralJeopardy, type JeopardyBoard } from './localGenerators/jeopardyGenerator';
+import { generateProceduralWheel, type WheelPuzzle } from './localGenerators/wheelGenerator';
+import { generateProceduralBluff, type BluffItem } from './localGenerators/bluffGenerator';
+import { generateProceduralHeadsUp, type HeadsUpCard } from './localGenerators/headsUpGenerator';
+import { generateProceduralWordHunt, type WordHuntResult } from './localGenerators/wordHuntGenerator';
+import { generateProceduralScattergories, type ScattergoriesRound } from './localGenerators/scattergoriesGenerator';
+import { generateProceduralElimination, type EliminationQuestion } from './localGenerators/eliminationGenerator';
 import { getContentHistoryCount, clearContentHistory } from './contentHistory';
 import type { TriviaQuestion } from '../data/hubData/triviaQuestions';
 import type { CharadesWord } from '../data/hubData/charadesWords';
@@ -247,6 +257,57 @@ export async function regenerateSingleGuessWordItem(
 ): Promise<WordCluePuzzle | null> {
   const res = await generateGuessWordContent({ ...req, count: 1 });
   return res.puzzles[0] || null;
+}
+
+// -------------------------------------------------------------
+// 10 NEW TEAM BATTLE GENERATOR EXPORTS
+// -------------------------------------------------------------
+
+export async function generatePasswordContent(req: { count?: number; category?: string; language?: 'en' | 'fil' }): Promise<{ words: PasswordItem[]; source: 'local' }> {
+  const words = await generateProceduralPassword(req);
+  return { words, source: 'local' };
+}
+
+export async function generateCatchphraseContent(req: { count?: number; category?: string; language?: 'en' | 'fil' }): Promise<{ phrases: CatchphraseItem[]; source: 'local' }> {
+  const phrases = await generateProceduralCatchphrase(req);
+  return { phrases, source: 'local' };
+}
+
+export async function generateTabooContent(req: { count?: number; category?: string; language?: 'en' | 'fil' }): Promise<{ cards: TabooCard[]; source: 'local' }> {
+  const cards = await generateProceduralTaboo(req);
+  return { cards, source: 'local' };
+}
+
+export async function generateJeopardyContent(): Promise<JeopardyBoard> {
+  return generateProceduralJeopardy();
+}
+
+export async function generateWheelContent(req: { count?: number; category?: string }): Promise<{ puzzles: WheelPuzzle[]; source: 'local' }> {
+  const puzzles = await generateProceduralWheel(req);
+  return { puzzles, source: 'local' };
+}
+
+export async function generateBluffContent(req: { count?: number }): Promise<{ items: BluffItem[]; source: 'local' }> {
+  const items = await generateProceduralBluff(req);
+  return { items, source: 'local' };
+}
+
+export async function generateHeadsUpContent(req: { count?: number; category?: string }): Promise<{ cards: HeadsUpCard[]; source: 'local' }> {
+  const cards = await generateProceduralHeadsUp(req);
+  return { cards, source: 'local' };
+}
+
+export async function generateWordHuntContent(): Promise<WordHuntResult> {
+  return generateProceduralWordHunt();
+}
+
+export async function generateScattergoriesContent(options?: { letter?: string; categoryCount?: number }): Promise<ScattergoriesRound> {
+  return generateProceduralScattergories(options);
+}
+
+export async function generateEliminationContent(req: { count?: number }): Promise<{ questions: EliminationQuestion[]; source: 'local' }> {
+  const questions = await generateProceduralElimination(req);
+  return { questions, source: 'local' };
 }
 
 export { clearContentHistory };

@@ -9,6 +9,17 @@ import {
   regenerateSingleCharadesItem,
   regenerateSinglePictionaryItem,
   regenerateSingleGuessWordItem,
+  // 10 Team Battle Generators
+  generatePasswordContent,
+  generateCatchphraseContent,
+  generateTabooContent,
+  generateJeopardyContent,
+  generateWheelContent,
+  generateBluffContent,
+  generateHeadsUpContent,
+  generateWordHuntContent,
+  generateScattergoriesContent,
+  generateEliminationContent,
   clearContentHistory,
 } from './contentEngine';
 import { recordContentUsage, isContentRecentlyUsed } from './contentHistory';
@@ -136,6 +147,75 @@ describe('Unified Content Generation Engine', () => {
 
       const isOtherUsed = await isContentRecentlyUsed('family-trivia', 'Completely Unseen Fact');
       expect(isOtherUsed).toBe(false);
+    });
+  });
+
+  describe('10 Team Battle Generators', () => {
+    it('generates Password items with hints', async () => {
+      const res = await generatePasswordContent({ count: 5 });
+      expect(res.words.length).toBeGreaterThanOrEqual(1);
+      expect(res.words[0].word).toBeTruthy();
+    });
+
+    it('generates Catchphrase items', async () => {
+      const res = await generateCatchphraseContent({ count: 5 });
+      expect(res.phrases.length).toBeGreaterThanOrEqual(1);
+      expect(res.phrases[0].phrase).toBeTruthy();
+    });
+
+    it('generates Taboo cards with 5 forbidden words', async () => {
+      const res = await generateTabooContent({ count: 4 });
+      expect(res.cards.length).toBeGreaterThanOrEqual(1);
+      expect(res.cards[0].target).toBeTruthy();
+      expect(res.cards[0].tabooWords.length).toBe(5);
+    });
+
+    it('generates Jeopardy 5x5 board with 5 categories and escalating values', async () => {
+      const res = await generateJeopardyContent();
+      expect(res.categories.length).toBe(5);
+      expect(res.categories[0].questions.length).toBe(5);
+      expect(res.categories[0].questions[0].value).toBe(100);
+      expect(res.categories[0].questions[4].value).toBe(500);
+    });
+
+    it('generates Wheel of Fortune mystery phrases', async () => {
+      const res = await generateWheelContent({ count: 3 });
+      expect(res.puzzles.length).toBeGreaterThanOrEqual(1);
+      expect(res.puzzles[0].phrase).toBeTruthy();
+      expect(res.puzzles[0].category).toBeTruthy();
+    });
+
+    it('generates Bluff trivia with questions and true answers', async () => {
+      const res = await generateBluffContent({ count: 3 });
+      expect(res.items.length).toBeGreaterThanOrEqual(1);
+      expect(res.items[0].question).toBeTruthy();
+      expect(res.items[0].trueAnswer).toBeTruthy();
+    });
+
+    it('generates Heads Up clue cards', async () => {
+      const res = await generateHeadsUpContent({ count: 6 });
+      expect(res.cards.length).toBeGreaterThanOrEqual(1);
+      expect(res.cards[0].item).toBeTruthy();
+    });
+
+    it('generates 4x4 Word Hunt board with path validator', async () => {
+      const res = await generateWordHuntContent();
+      expect(res.grid.length).toBe(4);
+      expect(res.grid[0].length).toBe(4);
+      expect(typeof res.isValidWordPath).toBe('function');
+    });
+
+    it('generates Scattergories list with key letter', async () => {
+      const res = await generateScattergoriesContent();
+      expect(res.letter).toBeTruthy();
+      expect(res.categories.length).toBeGreaterThanOrEqual(6);
+    });
+
+    it('generates Trivia Elimination survival questions', async () => {
+      const res = await generateEliminationContent({ count: 5 });
+      expect(res.questions.length).toBeGreaterThanOrEqual(1);
+      expect(res.questions[0].question).toBeTruthy();
+      expect(res.questions[0].options.length).toBe(4);
     });
   });
 });
