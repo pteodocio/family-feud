@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
+import { safeDecodeUriComponent } from '../utils/sanitize';
 
 export interface RouteMatch {
   path: string;
@@ -172,7 +173,7 @@ export function matchPattern(
 
     if (patternPart.startsWith(':')) {
       const paramName = patternPart.slice(1);
-      params[paramName] = decodeURIComponent(pathPart);
+      params[paramName] = safeDecodeUriComponent(pathPart);
     } else if (patternPart !== pathPart) {
       return { matches: false, params: {} };
     }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   RotateCcw,
   Volume2,
@@ -32,6 +32,7 @@ import type { FastMoneyStep } from '../types/game';
 import { matchAnswer } from '../engine/answerMatcher';
 import { ScoreAdjustModal } from '../components/host/ScoreAdjustModal';
 import { FAST_MONEY_SETS, getRandomFastMoneySet } from '../data/fastMoney';
+import { recordActiveTournamentIfMatching } from '../services/tournamentManager';
 
 interface HostConsolePageProps {
   gameId: string;
@@ -106,7 +107,26 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
     if (session?.phase === GamePhase.FAST_MONEY && session.fastMoney && !session.fastMoney.setId) {
       initFastMoneyWithSet(FAST_MONEY_SETS[0]);
     }
-  }, [session?.phase, session?.fastMoney?.setId, initFastMoneyWithSet]);
+  }, [session?.phase, session?.fastMoney, initFastMoneyWithSet]);
+
+  const sessionRef = useRef(session);
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+  const recordedTournamentSessionRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (
+      session?.phase === GamePhase.FINAL_RESULTS &&
+      recordedTournamentSessionRef.current !== session.id
+    ) {
+      recordedTournamentSessionRef.current = session.id;
+      recordActiveTournamentIfMatching('family-feud', [
+        { name: session.team1.name, score: session.team1.score },
+        { name: session.team2.name, score: session.team2.score },
+      ]);
+    }
+  }, [session?.phase, session?.id, session?.team1.name, session?.team1.score, session?.team2.name, session?.team2.score]);
 
   // TV Heartbeat ping/pong and sync listener
   useEffect(() => {
@@ -133,8 +153,8 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
       setTvStatus('connected');
       setTvConnected(true);
       setLastPongTime(Date.now());
-      if (session) {
-        syncBus.broadcastState(session);
+      if (sessionRef.current) {
+        syncBus.broadcastState(sessionRef.current);
       }
     });
 
@@ -143,7 +163,7 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
       unsubPong();
       unsubReqSync();
     };
-  }, [session]);
+  }, [setTvConnected]);
 
   const handleOpenTVDisplay = async () => {
     if (!session) return;
@@ -210,15 +230,26 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
         return;
       }
 
+      const currentPhase = session?.phase;
+      const isBoardRoundPhase =
+        currentPhase === GamePhase.FACEOFF ||
+        currentPhase === GamePhase.REGULAR ||
+        currentPhase === GamePhase.STEAL;
+
+      if (e.key === 'u' || e.key === 'U') {
+        e.preventDefault();
+        undo();
+        return;
+      }
+
+      if (!isBoardRoundPhase) return;
+
       if (e.key === 'x' || e.key === 'X') {
         e.preventDefault();
         recordStrike();
       } else if (e.key === 'z' || e.key === 'Z') {
         e.preventDefault();
         clearStrike();
-      } else if (e.key === 'u' || e.key === 'U') {
-        e.preventDefault();
-        undo();
       } else if (e.key >= '1' && e.key <= '8') {
         const round = session?.rounds[session.currentRoundIndex];
         if (round) {
@@ -878,7 +909,18 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
               </div>
 
               <button
-                onClick={advanceRound}
+                onClick={() => {
+                  if (
+                    !currentRound.isBankAwarded &&
+                    currentRound.roundBank > 0 &&
+                    !confirm(
+                      `Warning: ${currentRound.roundBank} points in the current bank have NOT been awarded to a team yet. Continue to the next round without awarding them?`
+                    )
+                  ) {
+                    return;
+                  }
+                  advanceRound();
+                }}
                 className="bg-feud-gold hover:bg-feud-goldLight text-feud-dark font-black text-xs px-5 py-2 rounded-lg shadow-gold-glow flex items-center gap-1.5"
               >
                 Proceed to Round Summary
@@ -1039,61 +1081,68 @@ export function HostConsolePage({ gameId }: HostConsolePageProps) {
             </div>
 
             {/* Timer Bar */}
-            <div className="bg-[#0b2256] border border-blue-800 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-inner">
-              <div className="flex items-center gap-3">
-                <Clock className="w-5 h-5 text-feud-gold" />
-                <span className="text-xs uppercase font-bold text-blue-200">
-                  {session.fastMoney.step === 'player2_playing' ? 'Player 2 Clock (25s)' : 'Player 1 Clock (20s)'}:
-                </span>
-                <span
-                  className={`font-mono font-black text-3xl ${
-                    fastMoneyTimer.remaining <= 5 && fastMoneyTimer.running
-                      ? 'text-red-400 animate-pulse'
-                      : 'text-feud-gold'
-                  }`}
-                >
-                  {fastMoneyTimer.remaining}s
-                </span>
-              </div>
+            {(() => {
+              const fmTimer1 = session.config.fastMoneyTimer1 || 20;
+              const fmTimer2 = session.config.fastMoneyTimer2 || 25;
+              const activeDefaultTimer =
+                session.fastMoney.step === 'player2_playing' || session.fastMoney.activePlayer === 2
+                  ? fmTimer2
+                  : fmTimer1;
+              return (
+                <div className="bg-[#0b2256] border border-blue-800 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-inner">
+                  <div className="flex items-center gap-3">
+                    <Clock className="w-5 h-5 text-feud-gold" />
+                    <span className="text-xs uppercase font-bold text-blue-200">
+                      {session.fastMoney.step === 'player2_playing'
+                        ? `Player 2 Clock (${fmTimer2}s)`
+                        : `Player 1 Clock (${fmTimer1}s)`}:
+                    </span>
+                    <span
+                      className={`font-mono font-black text-3xl ${
+                        fastMoneyTimer.remaining <= 5 && fastMoneyTimer.running
+                          ? 'text-red-400 animate-pulse'
+                          : 'text-feud-gold'
+                      }`}
+                    >
+                      {fastMoneyTimer.remaining}s
+                    </span>
+                  </div>
 
-              <div className="flex items-center gap-2">
-                {fastMoneyTimer.running ? (
-                  <button
-                    onClick={pauseFastMoneyTimer}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-amber-600 hover:bg-amber-500 rounded-lg text-white font-bold text-xs"
-                  >
-                    <Pause className="w-3.5 h-3.5" /> Pause
-                  </button>
-                ) : (
-                  <button
-                    onClick={() =>
-                      startFastMoneyTimer(
-                        fastMoneyTimer.remaining ||
-                          (session.fastMoney?.activePlayer === 2 ? 25 : 20)
-                      )
-                    }
-                    className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-500 rounded-lg text-white font-bold text-xs shadow-md"
-                  >
-                    <Play className="w-3.5 h-3.5" /> Start Timer
-                  </button>
-                )}
-                <button
-                  onClick={() =>
-                    resetFastMoneyTimer(session.fastMoney?.activePlayer === 2 ? 25 : 20)
-                  }
-                  className="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-300 font-bold text-xs"
-                >
-                  Reset
-                </button>
-                <button
-                  onClick={() => startFastMoneyTimer(fastMoneyTimer.remaining + 5)}
-                  className="px-2.5 py-1.5 bg-blue-900 hover:bg-blue-800 rounded-lg text-blue-200 font-bold text-xs"
-                  title="Add 5 seconds"
-                >
-                  +5s
-                </button>
-              </div>
-            </div>
+                  <div className="flex items-center gap-2">
+                    {fastMoneyTimer.running ? (
+                      <button
+                        onClick={pauseFastMoneyTimer}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-amber-600 hover:bg-amber-500 rounded-lg text-white font-bold text-xs"
+                      >
+                        <Pause className="w-3.5 h-3.5" /> Pause
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() =>
+                          startFastMoneyTimer(fastMoneyTimer.remaining || activeDefaultTimer)
+                        }
+                        className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-500 rounded-lg text-white font-bold text-xs shadow-md"
+                      >
+                        <Play className="w-3.5 h-3.5" /> Start Timer
+                      </button>
+                    )}
+                    <button
+                      onClick={() => resetFastMoneyTimer(activeDefaultTimer)}
+                      className="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-300 font-bold text-xs"
+                    >
+                      Reset
+                    </button>
+                    <button
+                      onClick={() => startFastMoneyTimer(fastMoneyTimer.remaining + 5)}
+                      className="px-2.5 py-1.5 bg-blue-900 hover:bg-blue-800 rounded-lg text-blue-200 font-bold text-xs"
+                      title="Add 5 seconds"
+                    >
+                      +5s
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* LIVE STEPPER VIEW (When Player 1 or Player 2 is Playing) */}
             {(session.fastMoney.step === 'player1_playing' ||

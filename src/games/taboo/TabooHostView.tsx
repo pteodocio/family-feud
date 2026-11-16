@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { CheckCircle2, Ban, ShieldAlert } from 'lucide-react';
 import { generateProceduralTaboo, type TabooCard } from '../../services/localGenerators/tabooGenerator';
 import { SharedTimer } from '../../components/shared/SharedTimer';
@@ -6,6 +6,8 @@ import { SharedScoreboard, type ScoreboardParticipant } from '../../components/s
 import { WinnerPodiumModal } from '../../components/shared/WinnerPodiumModal';
 import { hubSyncBus } from '../../sync/hubSync';
 import { soundManager } from '../../audio/soundManager';
+import { loadCustomHubContent } from '../../utils/hubContentLoader';
+import { useHubHostSync } from '../../utils/useHubHostSync';
 
 interface TabooHostViewProps {
   teams: ScoreboardParticipant[];
@@ -31,6 +33,11 @@ export function TabooHostView({ teams: initialTeams, onEndGame, onReturnToHub }:
   const [isGameFinished, setIsGameFinished] = useState(false);
 
   useEffect(() => {
+    const custom = loadCustomHubContent<TabooCard>('taboo');
+    if (custom) {
+      setCards(custom);
+      return;
+    }
     generateProceduralTaboo({ count: 15 }).then((res) => {
       setCards(res);
     });
@@ -43,9 +50,9 @@ export function TabooHostView({ teams: initialTeams, onEndGame, onReturnToHub }:
     tabooWords: ['OFW', 'Padala', 'Kahon', 'Pasalubong', 'Duty Free'],
   };
 
-  // Broadcast to TV (AUDIENCE CONCEALMENT: omit target and tabooWords from TV payload until guessed)
-  useEffect(() => {
-    hubSyncBus.broadcastStateUpdate({
+  // AUDIENCE CONCEALMENT: omit target and tabooWords from TV payload until game finishes
+  const syncPayload = useMemo(
+    () => ({
       gameId: 'taboo',
       category: currentCard.category,
       activeTeamName: teams[activeTeamIdx]?.name || 'Team 1',
@@ -53,17 +60,30 @@ export function TabooHostView({ teams: initialTeams, onEndGame, onReturnToHub }:
       strikes,
       teams,
       isGameFinished,
-    });
-  }, [currentCard, activeTeamIdx, strikes, teams, isGameFinished]);
+    }),
+    [currentCard, activeTeamIdx, strikes, teams, isGameFinished]
+  );
+  useHubHostSync(syncPayload);
+
+  const advanceCard = (latestTeams: ScoreboardParticipant[] = teams) => {
+    if (cardIndex >= cards.length - 1) {
+      setTimerRunning(false);
+      setIsGameFinished(true);
+      onEndGame(latestTeams);
+      return;
+    }
+    setCardIndex((prev) => prev + 1);
+  };
 
   const handleCorrect = () => {
     soundManager.playPartyCue('correct');
     hubSyncBus.broadcastSoundTrigger('correct');
 
-    setTeams((prev) =>
-      prev.map((t, idx) => (idx === activeTeamIdx ? { ...t, score: t.score + 1 } : t))
+    const updatedTeams = teams.map((t, idx) =>
+      idx === activeTeamIdx ? { ...t, score: t.score + 1 } : t
     );
-    advanceCard();
+    setTeams(updatedTeams);
+    advanceCard(updatedTeams);
   };
 
   const handlePenaltyStrike = () => {
@@ -71,25 +91,17 @@ export function TabooHostView({ teams: initialTeams, onEndGame, onReturnToHub }:
     hubSyncBus.broadcastSoundTrigger('strike');
 
     setStrikes((prev) => prev + 1);
-    setTeams((prev) =>
-      prev.map((t, idx) => (idx === activeTeamIdx ? { ...t, score: Math.max(0, t.score - 1) } : t))
+    const updatedTeams = teams.map((t, idx) =>
+      idx === activeTeamIdx ? { ...t, score: Math.max(0, t.score - 1) } : t
     );
-    advanceCard();
+    setTeams(updatedTeams);
+    advanceCard(updatedTeams);
   };
 
   const handlePass = () => {
     soundManager.playPartyCue('wrong');
     hubSyncBus.broadcastSoundTrigger('wrong');
-    advanceCard();
-  };
-
-  const advanceCard = () => {
-    if (cardIndex >= cards.length - 1) {
-      setIsGameFinished(true);
-      onEndGame(teams);
-      return;
-    }
-    setCardIndex((prev) => prev + 1);
+    advanceCard(teams);
   };
 
   const handleSwitchTeamTurn = () => {
@@ -118,7 +130,7 @@ export function TabooHostView({ teams: initialTeams, onEndGame, onReturnToHub }:
         <div className="flex items-center gap-4">
           <SharedTimer
             initialSeconds={60}
-            resetKey={`${activeTeamIdx}_${cardIndex}`}
+            resetKey={activeTeamIdx}
             isRunning={timerRunning}
             onExpire={() => {
               setTimerRunning(false);
@@ -131,6 +143,7 @@ export function TabooHostView({ teams: initialTeams, onEndGame, onReturnToHub }:
 
           <button
             onClick={() => {
+              setTimerRunning(false);
               setIsGameFinished(true);
               onEndGame(teams);
             }}

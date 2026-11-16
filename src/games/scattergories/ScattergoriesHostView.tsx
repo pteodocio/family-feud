@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dices, RefreshCw } from 'lucide-react';
 import { generateProceduralScattergories, type ScattergoriesRound } from '../../services/localGenerators/scattergoriesGenerator';
 import { SharedTimer } from '../../components/shared/SharedTimer';
@@ -6,6 +6,8 @@ import { SharedScoreboard, type ScoreboardParticipant } from '../../components/s
 import { WinnerPodiumModal } from '../../components/shared/WinnerPodiumModal';
 import { hubSyncBus } from '../../sync/hubSync';
 import { soundManager } from '../../audio/soundManager';
+import { loadCustomHubContent } from '../../utils/hubContentLoader';
+import { useHubHostSync } from '../../utils/useHubHostSync';
 
 interface ScattergoriesHostViewProps {
   teams: ScoreboardParticipant[];
@@ -36,35 +38,56 @@ export function ScattergoriesHostView({ teams: initialTeams, onEndGame, onReturn
   });
 
   const [timerRunning, setTimerRunning] = useState(false);
+  const [roundVersion, setRoundVersion] = useState(1);
   const [isReviewing, setIsReviewing] = useState(false);
+  const [isRoundScored, setIsRoundScored] = useState(false);
   const [teamAnswers, setTeamAnswers] = useState<Record<string, Record<number, string>>>({});
   const [isGameFinished, setIsGameFinished] = useState(false);
 
-  const rollNewRound = async () => {
+  const rollNewRound = async (playSound: boolean = true) => {
     const res = await generateProceduralScattergories({ categoryCount: 6 });
     setRoundData(res);
     setTeamAnswers({});
     setIsReviewing(false);
+    setIsRoundScored(false);
     setTimerRunning(false);
-    soundManager.playPartyCue('whistle');
-    hubSyncBus.broadcastSoundTrigger('whistle');
+    setRoundVersion((prev) => prev + 1);
+    if (playSound) {
+      soundManager.playPartyCue('whistle');
+      hubSyncBus.broadcastSoundTrigger('whistle');
+    }
   };
 
   useEffect(() => {
-    rollNewRound();
+    const custom = loadCustomHubContent<ScattergoriesRound | string>('scattergories');
+    if (custom && custom.length > 0) {
+      const first = custom[0];
+      if (typeof first === 'object' && first !== null && Array.isArray(first.categories) && first.letter) {
+        setRoundData({ letter: first.letter, categories: first.categories });
+        return;
+      }
+      if (typeof first === 'string') {
+        generateProceduralScattergories({ categoryCount: 6 }).then((res) => {
+          setRoundData({ letter: res.letter, categories: custom as string[] });
+        });
+        return;
+      }
+    }
+    rollNewRound(false);
   }, []);
 
-  // Broadcast to TV
-  useEffect(() => {
-    hubSyncBus.broadcastStateUpdate({
+  const syncPayload = useMemo(
+    () => ({
       gameId: 'scattergories',
       letter: roundData.letter,
       categories: roundData.categories,
       isReviewing,
       teams,
       isGameFinished,
-    });
-  }, [roundData, isReviewing, teams, isGameFinished]);
+    }),
+    [roundData, isReviewing, teams, isGameFinished]
+  );
+  useHubHostSync(syncPayload);
 
   const handleUpdateAnswer = (teamId: string, catIdx: number, val: string) => {
     setTeamAnswers((prev) => ({
@@ -77,6 +100,8 @@ export function ScattergoriesHostView({ teams: initialTeams, onEndGame, onReturn
   };
 
   const handleScoreRound = () => {
+    if (isRoundScored) return;
+    setIsRoundScored(true);
     soundManager.playPartyCue('round_win');
     hubSyncBus.broadcastSoundTrigger('round_win');
 
@@ -128,7 +153,7 @@ export function ScattergoriesHostView({ teams: initialTeams, onEndGame, onReturn
         <div className="flex items-center gap-4">
           <SharedTimer
             initialSeconds={120}
-            resetKey={roundData.letter}
+            resetKey={roundVersion}
             isRunning={timerRunning}
             onExpire={() => {
               setTimerRunning(false);
@@ -142,6 +167,7 @@ export function ScattergoriesHostView({ teams: initialTeams, onEndGame, onReturn
 
           <button
             onClick={() => {
+              setTimerRunning(false);
               setIsGameFinished(true);
               onEndGame(teams);
             }}
@@ -161,7 +187,7 @@ export function ScattergoriesHostView({ teams: initialTeams, onEndGame, onReturn
                 Write answers starting with letter: <b className="text-rose-400 font-display text-lg">"{roundData.letter}"</b>
               </span>
               <button
-                onClick={rollNewRound}
+                onClick={() => rollNewRound(true)}
                 className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 flex items-center gap-1.5"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -219,9 +245,12 @@ export function ScattergoriesHostView({ teams: initialTeams, onEndGame, onReturn
 
                 <button
                   onClick={handleScoreRound}
-                  className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-display font-black text-sm shadow transition-transform active:scale-95"
+                  disabled={isRoundScored}
+                  className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-display font-black text-sm shadow transition-transform active:scale-95"
                 >
-                  Calculate & Award Unique Answer Points!
+                  {isRoundScored
+                    ? 'Round Points Applied (Spin New Letter to Play Next Round)'
+                    : 'Calculate & Award Unique Answer Points!'}
                 </button>
               </div>
             ) : (
@@ -253,7 +282,9 @@ export function ScattergoriesHostView({ teams: initialTeams, onEndGame, onReturn
           gameTitle="Scattergories Championship"
           onPlayAgain={() => {
             setIsGameFinished(false);
-            rollNewRound();
+            setIsRoundScored(false);
+            setTimerRunning(false);
+            rollNewRound(false);
             setTeams((prev) => prev.map((t) => ({ ...t, score: 0 })));
           }}
           onReturnToHub={onReturnToHub}

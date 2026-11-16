@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Play, RotateCcw, Award, CheckCircle2 } from 'lucide-react';
 import {
   BINGO_PATTERNS,
@@ -20,29 +20,70 @@ interface BingoHostViewProps {
   onReturnToHub: () => void;
 }
 
+interface RichBingoCard extends BingoCard {
+  labels?: string[][];
+}
+
 export function BingoHostView({ teams, onEndGame, onReturnToHub }: BingoHostViewProps) {
   const [calledNumbers, setCalledNumbers] = useState<number[]>([]);
+  const [calledLabels, setCalledLabels] = useState<string[]>([]);
   const [currentNumber, setCurrentNumber] = useState<number | null>(null);
+  const [currentLabel, setCurrentLabel] = useState<string | null>(null);
   const [selectedPatternId, setSelectedPatternId] = useState<string>('line');
-  const [playerCards, setPlayerCards] = useState<BingoCard[]>([]);
+  const [playerCards, setPlayerCards] = useState<RichBingoCard[]>([]);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [winnerName, setWinnerName] = useState<string | null>(null);
+  const [finalParticipants, setFinalParticipants] = useState<ScoreboardParticipant[]>(teams);
   const [isGameFinished, setIsGameFinished] = useState(false);
   const [autoCallRunning, setAutoCallRunning] = useState(false);
 
-  // Initialize cards for participants (support dynamically generated cards)
+  const themedPool = useMemo(() => {
+    const items = new Set<string>();
+    for (const card of playerCards) {
+      if (!card.labels) continue;
+      for (let r = 0; r < card.labels.length; r++) {
+        for (let c = 0; c < card.labels[r].length; c++) {
+          if (r === 2 && c === 2) continue;
+          const label = card.labels[r][c]?.trim();
+          if (label && label !== 'FREE') items.add(label);
+        }
+      }
+    }
+    return Array.from(items);
+  }, [playerCards]);
+  const isThemedMode = themedPool.length > 0;
+
+  // Initialize cards for participants (support dynamically generated classic OR themed cards)
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem('hub_custom_content_family-bingo');
       if (raw) {
         const customCards = JSON.parse(raw);
         if (Array.isArray(customCards) && customCards.length > 0) {
-          const mappedCards: BingoCard[] = customCards.map((c, i) => {
+          const hasThemedCells = customCards.some((c: any) =>
+            c.grid?.some((row: any[], r: number) =>
+              row?.some(
+                (cell: any, col: number) =>
+                  !cell.isFree &&
+                  !(r === 2 && col === 2) &&
+                  !/^\d+$/.test(String(cell.text || '').trim())
+              )
+            )
+          );
+
+          const mappedCards: RichBingoCard[] = customCards.map((c: any, i: number) => {
+            const labels = hasThemedCells
+              ? c.grid.map((row: any[], r: number) =>
+                  row.map((cell: any, col: number) =>
+                    cell.isFree || (r === 2 && col === 2) ? 'FREE' : String(cell.text || '')
+                  )
+                )
+              : undefined;
             const grid = c.grid.map((row: any[], r: number) =>
               row.map((cell: any, col: number) => {
                 if (cell.isFree || (r === 2 && col === 2)) return 0;
                 const parsed = parseInt(cell.text, 10);
-                return isNaN(parsed) ? (col * 15 + (r + 1)) : parsed;
+                return Number.isNaN(parsed) ? col * 15 + (r + 1) : parsed;
               })
             );
             const marked = c.grid.map((row: any[], r: number) =>
@@ -53,6 +94,7 @@ export function BingoHostView({ teams, onEndGame, onReturnToHub }: BingoHostView
               playerName: c.playerName || (teams[i]?.name ? teams[i].name : `Player ${i + 1}`),
               grid,
               marked,
+              labels,
             };
           });
           setPlayerCards(mappedCards);
@@ -67,29 +109,62 @@ export function BingoHostView({ teams, onEndGame, onReturnToHub }: BingoHostView
   }, [teams]);
 
   // Broadcast state to TV whenever state changes or sync is requested
-  const broadcastCurrentState = () => {
+  const broadcastCurrentState = useCallback(() => {
     hubSyncBus.broadcastState({
       gameId: 'family-bingo',
       calledNumbers,
+      calledLabels,
       currentNumber,
+      currentLabel,
+      isThemedMode,
+      themedTotal: themedPool.length,
       selectedPattern: BINGO_PATTERNS.find((p) => p.id === selectedPatternId),
       winnerName,
       isGameFinished,
     });
-  };
+  }, [calledNumbers, calledLabels, currentNumber, currentLabel, isThemedMode, themedPool.length, selectedPatternId, winnerName, isGameFinished]);
 
   useEffect(() => {
     broadcastCurrentState();
-  }, [calledNumbers, currentNumber, selectedPatternId, winnerName, isGameFinished]);
+  }, [broadcastCurrentState]);
 
   useEffect(() => {
     const unsub = hubSyncBus.onRequestSync(() => {
       broadcastCurrentState();
     });
     return () => unsub();
-  }, [calledNumbers, currentNumber, selectedPatternId, winnerName, isGameFinished]);
+  }, [broadcastCurrentState]);
+
+  const totalCallableCount = isThemedMode ? themedPool.length : 75;
+  const currentCalledCount = isThemedMode ? calledLabels.length : calledNumbers.length;
 
   const handleCallNextNumber = () => {
+    if (isGameFinished) return;
+
+    if (isThemedMode) {
+      const uncalled = themedPool.filter((label) => !calledLabels.includes(label));
+      if (uncalled.length === 0) return;
+
+      const nextLabel = uncalled[Math.floor(Math.random() * uncalled.length)];
+      soundManager.playPartyCue('bingoRoll');
+      hubSyncBus.broadcastSound('bingoRoll');
+
+      setCurrentLabel(nextLabel);
+      setCalledLabels((prev) => [...prev, nextLabel]);
+
+      setPlayerCards((prev) =>
+        prev.map((card) => {
+          const newMarked = card.marked.map((row, r) =>
+            row.map((val, c) =>
+              card.labels?.[r]?.[c]?.toLowerCase() === nextLabel.toLowerCase() ? true : val
+            )
+          );
+          return { ...card, marked: newMarked };
+        })
+      );
+      return;
+    }
+
     if (calledNumbers.length >= 75) return;
 
     // Pick uncalled number between 1 and 75
@@ -116,13 +191,37 @@ export function BingoHostView({ teams, onEndGame, onReturnToHub }: BingoHostView
     );
   };
 
-  const handleVerifyCard = (card: BingoCard) => {
+  const buildFinalParticipants = (winningPlayerName: string | null): ScoreboardParticipant[] => {
+    if (teams.length > 0) {
+      const matchedAny = teams.some(
+        (t) => winningPlayerName && t.name.trim().toLowerCase() === winningPlayerName.trim().toLowerCase()
+      );
+      return teams.map((t, idx) => {
+        const isCardWinner =
+          Boolean(winningPlayerName) &&
+          (matchedAny
+            ? t.name.trim().toLowerCase() === winningPlayerName!.trim().toLowerCase()
+            : playerCards[idx]?.playerName === winningPlayerName);
+        return {
+          ...t,
+          score: isCardWinner ? t.score + 100 : t.score,
+        };
+      });
+    }
+    return [{ id: 'bingo_winner', name: winningPlayerName || 'Winner', score: 100, color: 'gold' }];
+  };
+
+  const handleVerifyCard = (card: RichBingoCard) => {
     const isWin = checkBingoWin(card, selectedPatternId);
     if (isWin) {
       soundManager.playPartyCue('bingoWin');
       hubSyncBus.broadcastSound('bingoWin');
+      setAutoCallRunning(false);
       setWinnerName(card.playerName);
+      const nextFinal = buildFinalParticipants(card.playerName);
+      setFinalParticipants(nextFinal);
       setIsGameFinished(true);
+      onEndGame(nextFinal);
       recordContentUsage({
         gameId: 'family-bingo',
         itemTitle: `Bingo Win - ${card.playerName}`,
@@ -148,12 +247,24 @@ export function BingoHostView({ teams, onEndGame, onReturnToHub }: BingoHostView
   };
 
   const handleResetGame = () => {
+    setAutoCallRunning(false);
     setCalledNumbers([]);
+    setCalledLabels([]);
     setCurrentNumber(null);
+    setCurrentLabel(null);
     setWinnerName(null);
+    setFinalParticipants(teams);
     setIsGameFinished(false);
-    const names = teams.length > 0 ? teams.map((t) => t.name) : ['Player 1', 'Player 2'];
-    setPlayerCards(names.map((name, i) => generateBingoCard(`card_${i}`, name)));
+    setPlayerCards((prev) =>
+      prev.length > 0 && isThemedMode
+        ? prev.map((card) => ({
+            ...card,
+            marked: card.marked.map((row, r) => row.map((_, c) => r === 2 && c === 2)),
+          }))
+        : (teams.length > 0 ? teams.map((t) => t.name) : ['Player 1', 'Player 2']).map((name, i) =>
+            generateBingoCard(`card_${i}`, name)
+          )
+    );
   };
 
   const currentCard = playerCards[activeCardIndex] || playerCards[0];
@@ -167,7 +278,9 @@ export function BingoHostView({ teams, onEndGame, onReturnToHub }: BingoHostView
             Family Bingo Caller Console
           </span>
           <h2 className="text-lg font-bold text-white">
-            {calledNumbers.length} / 75 Numbers Called
+            {isThemedMode
+              ? `${calledLabels.length} / ${totalCallableCount} Items Called`
+              : `${calledNumbers.length} / 75 Numbers Called`}
           </h2>
         </div>
 
@@ -187,12 +300,12 @@ export function BingoHostView({ teams, onEndGame, onReturnToHub }: BingoHostView
 
           <SharedTimer
             initialSeconds={10}
-            resetKey={calledNumbers.length}
+            resetKey={currentCalledCount}
             isRunning={autoCallRunning}
             onToggle={() => setAutoCallRunning((prev) => !prev)}
             onReset={() => setAutoCallRunning(false)}
             onExpire={() => {
-              if (calledNumbers.length < 75) {
+              if (currentCalledCount < totalCallableCount && !isGameFinished) {
                 handleCallNextNumber();
               } else {
                 setAutoCallRunning(false);
@@ -202,11 +315,11 @@ export function BingoHostView({ teams, onEndGame, onReturnToHub }: BingoHostView
 
           <button
             onClick={handleCallNextNumber}
-            disabled={calledNumbers.length >= 75}
+            disabled={currentCalledCount >= totalCallableCount || isGameFinished}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md transition-transform active:scale-95 disabled:opacity-50"
           >
             <Play className="w-4 h-4 fill-current" />
-            Call Next Ball
+            {isThemedMode ? 'Call Next Item' : 'Call Next Ball'}
           </button>
 
           <button
@@ -216,6 +329,17 @@ export function BingoHostView({ teams, onEndGame, onReturnToHub }: BingoHostView
           >
             <RotateCcw className="w-4 h-4" />
           </button>
+
+          <button
+            onClick={() => {
+              setAutoCallRunning(false);
+              setIsGameFinished(true);
+              onEndGame(finalParticipants);
+            }}
+            className="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold transition-colors"
+          >
+            Finish Game
+          </button>
         </div>
       </div>
 
@@ -224,10 +348,22 @@ export function BingoHostView({ teams, onEndGame, onReturnToHub }: BingoHostView
         {/* Left Col: Current Ball Caller Spotlight */}
         <div className="flex flex-col items-center justify-center p-6 rounded-3xl bg-[#140f04] border-2 border-amber-500/80 shadow-2xl text-center">
           <span className="text-xs font-black uppercase tracking-widest text-amber-400 mb-2">
-            Last Called Ball
+            {isThemedMode ? 'Last Called Item' : 'Last Called Ball'}
           </span>
 
-          {currentNumber ? (
+          {isThemedMode ? (
+            currentLabel ? (
+              <div className="px-6 py-8 rounded-3xl bg-gradient-to-b from-amber-300 to-amber-500 border-4 border-amber-200 flex items-center justify-center text-slate-950 shadow-2xl shadow-amber-500/40 my-2 min-w-[200px]">
+                <span className="text-xl sm:text-2xl font-display font-black uppercase leading-snug">
+                  {currentLabel}
+                </span>
+              </div>
+            ) : (
+              <div className="w-32 h-32 rounded-full border-2 border-dashed border-amber-500/40 flex items-center justify-center text-xs text-amber-400/60 font-bold my-2">
+                Ready to Roll
+              </div>
+            )
+          ) : currentNumber ? (
             <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-full bg-gradient-to-b from-amber-300 to-amber-500 border-4 border-amber-200 flex flex-col items-center justify-center text-slate-950 shadow-2xl shadow-amber-500/40 my-2 animate-in zoom-in duration-200">
               <span className="text-xl sm:text-2xl font-black leading-none">
                 {getBingoLetter(currentNumber)}
@@ -246,57 +382,95 @@ export function BingoHostView({ teams, onEndGame, onReturnToHub }: BingoHostView
             Winning Rule: {BINGO_PATTERNS.find((p) => p.id === selectedPatternId)?.description}
           </div>
 
-          {/* Recent 5 Balls Reel */}
-          {calledNumbers.length > 1 && (
+          {/* Recent Reel */}
+          {(!isThemedMode && calledNumbers.length > 1) || (isThemedMode && calledLabels.length > 1) ? (
             <div className="mt-3 pt-3 border-t border-amber-900/60 w-full">
               <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400/80 block mb-1.5">
-                Recent Balls:
+                {isThemedMode ? 'Recent Items:' : 'Recent Balls:'}
               </span>
               <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                {calledNumbers.slice(-5).reverse().map((n, idx) => (
-                  <span
-                    key={idx}
-                    className={`px-2 py-0.5 rounded-md text-xs font-mono font-bold ${
-                      idx === 0
-                        ? 'bg-amber-400 text-slate-950 font-black'
-                        : 'bg-amber-950/80 text-amber-300 border border-amber-800'
+                {isThemedMode
+                  ? calledLabels.slice(-5).reverse().map((lbl, idx) => (
+                      <span
+                        key={idx}
+                        className={`px-2 py-0.5 rounded-md text-xs font-bold ${
+                          idx === 0
+                            ? 'bg-amber-400 text-slate-950 font-black'
+                            : 'bg-amber-950/80 text-amber-300 border border-amber-800'
+                        }`}
+                      >
+                        {lbl}
+                      </span>
+                    ))
+                  : calledNumbers.slice(-5).reverse().map((n, idx) => (
+                      <span
+                        key={idx}
+                        className={`px-2 py-0.5 rounded-md text-xs font-mono font-bold ${
+                          idx === 0
+                            ? 'bg-amber-400 text-slate-950 font-black'
+                            : 'bg-amber-950/80 text-amber-300 border border-amber-800'
+                        }`}
+                      >
+                        {getBingoLetter(n)}{n}
+                      </span>
+                    ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        {/* Right 2 Cols: Master Board Grid */}
+        <div className="lg:col-span-2 p-5 rounded-3xl bg-[#090e1f] border border-slate-800 shadow-xl flex flex-col">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
+            {isThemedMode ? 'Themed Calling Board' : '75-Number Master Tracking Grid'}
+          </h3>
+
+          {isThemedMode ? (
+            <div className="flex flex-wrap gap-1.5 flex-1 content-start">
+              {themedPool.map((item) => {
+                const isCalled = calledLabels.includes(item);
+                const isLatest = currentLabel === item;
+                return (
+                  <div
+                    key={item}
+                    className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all ${
+                      isLatest
+                        ? 'bg-amber-400 text-slate-950 border-white font-black'
+                        : isCalled
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/60'
+                        : 'bg-slate-950/60 text-slate-400 border-slate-800'
                     }`}
                   >
-                    {getBingoLetter(n)}{n}
-                  </span>
-                ))}
+                    {item}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="overflow-x-auto pb-1 flex-1">
+              <div className="grid grid-cols-15 gap-1 text-[11px] font-mono font-bold min-w-[520px]">
+                {Array.from({ length: 75 }, (_, i) => i + 1).map((n) => {
+                  const isCalled = calledNumbers.includes(n);
+                  const isLatest = currentNumber === n;
+
+                  return (
+                    <div
+                      key={n}
+                      className={`h-7 flex items-center justify-center rounded-md border transition-all ${
+                        isLatest
+                          ? 'bg-amber-400 text-slate-950 border-white ring-2 ring-amber-300 scale-110 font-black'
+                          : isCalled
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/60 font-bold'
+                          : 'bg-slate-950/60 text-slate-600 border-slate-800'
+                      }`}
+                    >
+                      {n}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
-        </div>
-
-        {/* Right 2 Cols: 75 Master Board Grid */}
-        <div className="lg:col-span-2 p-5 rounded-3xl bg-[#090e1f] border border-slate-800 shadow-xl flex flex-col">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-            75-Number Master Tracking Grid
-          </h3>
-
-          <div className="grid grid-cols-15 gap-1 text-[11px] font-mono font-bold flex-1">
-            {Array.from({ length: 75 }, (_, i) => i + 1).map((n) => {
-              const isCalled = calledNumbers.includes(n);
-              const isLatest = currentNumber === n;
-
-              return (
-                <div
-                  key={n}
-                  className={`h-7 flex items-center justify-center rounded-md border transition-all ${
-                    isLatest
-                      ? 'bg-amber-400 text-slate-950 border-white ring-2 ring-amber-300 scale-110 font-black'
-                      : isCalled
-                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/60 font-bold'
-                      : 'bg-slate-950/60 text-slate-600 border-slate-800'
-                  }`}
-                >
-                  {n}
-                </div>
-              );
-            })}
-          </div>
         </div>
       </div>
 
@@ -357,7 +531,7 @@ export function BingoHostView({ teams, onEndGame, onReturnToHub }: BingoHostView
                     <button
                       key={`${r}-${c}`}
                       onClick={() => handleToggleCell(activeCardIndex, r, c)}
-                      className={`h-12 rounded-xl flex items-center justify-center font-mono font-bold text-sm sm:text-base border transition-all ${
+                      className={`min-h-12 p-1 rounded-xl flex items-center justify-center font-mono font-bold text-xs sm:text-sm text-center border transition-all ${
                         isFree
                           ? 'bg-amber-500/30 text-amber-300 border-amber-500/80 font-black text-xs'
                           : isMarked
@@ -365,7 +539,7 @@ export function BingoHostView({ teams, onEndGame, onReturnToHub }: BingoHostView
                           : 'bg-slate-900 text-slate-200 border-slate-800 hover:bg-slate-800'
                       }`}
                     >
-                      {isFree ? 'FREE' : val}
+                      {isFree ? 'FREE' : currentCard.labels?.[r]?.[c] ?? val}
                     </button>
                   );
                 })
@@ -379,10 +553,10 @@ export function BingoHostView({ teams, onEndGame, onReturnToHub }: BingoHostView
       <WinnerPodiumModal
         isOpen={isGameFinished}
         gameTitle="Family Bingo"
-        participants={[{ id: 'bingo_winner', name: winnerName || 'Winner', score: 100 }]}
+        participants={finalParticipants}
         onPlayAgain={handleResetGame}
         onReturnToHub={() => {
-          onEndGame([{ id: 'bingo_winner', name: winnerName || 'Winner', score: 100 }]);
+          onEndGame(finalParticipants);
           onReturnToHub();
         }}
       />

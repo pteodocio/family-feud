@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { CheckCircle2, RotateCw, Sparkles } from 'lucide-react';
 import { generateProceduralWheel, type WheelPuzzle } from '../../services/localGenerators/wheelGenerator';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
@@ -6,6 +6,8 @@ import { SharedTimer } from '../../components/shared/SharedTimer';
 import { WinnerPodiumModal } from '../../components/shared/WinnerPodiumModal';
 import { hubSyncBus } from '../../sync/hubSync';
 import { soundManager } from '../../audio/soundManager';
+import { loadCustomHubContent } from '../../utils/hubContentLoader';
+import { useHubHostSync } from '../../utils/useHubHostSync';
 
 interface WheelFortuneHostViewProps {
   teams: ScoreboardParticipant[];
@@ -48,13 +50,25 @@ export function WheelFortuneHostView({ teams: initialTeams, onEndGame, onReturnT
   const [roundBank, setRoundBank] = useState(0);
   const [currentWedge, setCurrentWedge] = useState<string | null>(null);
   const [isSpinning, setIsSpinning] = useState(false);
+  const [isPuzzleSolved, setIsPuzzleSolved] = useState(false);
   const [isGameFinished, setIsGameFinished] = useState(false);
   const [timerRunning, setTimerRunning] = useState(false);
+  const spinTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    generateProceduralWheel({ count: 5 }).then((res) => {
-      setPuzzles(res);
-    });
+    const custom = loadCustomHubContent<WheelPuzzle>('wheel-of-fortune');
+    if (custom) {
+      setPuzzles(custom);
+    } else {
+      generateProceduralWheel({ count: 5 }).then((res) => {
+        setPuzzles(res);
+      });
+    }
+    return () => {
+      if (spinTimeoutRef.current !== null) {
+        clearTimeout(spinTimeoutRef.current);
+      }
+    };
   }, []);
 
   const currentPuzzle = puzzles[puzzleIdx] || {
@@ -63,9 +77,8 @@ export function WheelFortuneHostView({ teams: initialTeams, onEndGame, onReturnT
     category: 'Pinoy Habit',
   };
 
-  // Broadcast to TV
-  useEffect(() => {
-    hubSyncBus.broadcastStateUpdate({
+  const syncPayload = useMemo(
+    () => ({
       gameId: 'wheel-of-fortune',
       phrase: currentPuzzle.phrase,
       category: currentPuzzle.category,
@@ -77,15 +90,20 @@ export function WheelFortuneHostView({ teams: initialTeams, onEndGame, onReturnT
       isSpinning,
       teams,
       isGameFinished,
-    });
-  }, [currentPuzzle, guessedLetters, activeTeamIdx, roundBank, currentWedge, isSpinning, teams, isGameFinished]);
+    }),
+    [currentPuzzle, guessedLetters, activeTeamIdx, roundBank, currentWedge, isSpinning, teams, isGameFinished]
+  );
+  useHubHostSync(syncPayload);
 
   const handleSpinWheel = () => {
+    if (isSpinning || isPuzzleSolved) return;
+    if (spinTimeoutRef.current !== null) clearTimeout(spinTimeoutRef.current);
     setIsSpinning(true);
     soundManager.playPartyCue('tick');
     hubSyncBus.broadcastSoundTrigger('tick');
 
-    setTimeout(() => {
+    spinTimeoutRef.current = setTimeout(() => {
+      spinTimeoutRef.current = null;
       const wedge = WHEEL_WEDGES[Math.floor(Math.random() * WHEEL_WEDGES.length)];
       setCurrentWedge(wedge.label);
       setIsSpinning(false);
@@ -107,10 +125,13 @@ export function WheelFortuneHostView({ teams: initialTeams, onEndGame, onReturnT
   };
 
   const handleGuessLetter = (letter: string) => {
-    if (guessedLetters.includes(letter)) return;
-    setGuessedLetters((prev) => [...prev, letter]);
+    if (isPuzzleSolved || guessedLetters.includes(letter)) return;
 
     const isVowel = VOWELS.includes(letter);
+    if (isVowel && roundBank < 250) return;
+
+    setGuessedLetters((prev) => [...prev, letter]);
+
     if (isVowel) {
       // Vowel buying costs 250 points
       setRoundBank((prev) => Math.max(0, prev - 250));
@@ -134,20 +155,24 @@ export function WheelFortuneHostView({ teams: initialTeams, onEndGame, onReturnT
   };
 
   const handleSolvePuzzle = () => {
+    if (isPuzzleSolved) return;
     soundManager.playPartyCue('round_win');
     hubSyncBus.broadcastSoundTrigger('round_win');
 
-    // Reveal all letters
+    setIsPuzzleSolved(true);
+    setTimerRunning(false);
     setGuessedLetters(ALPHABET);
 
-    // Lock round bank into active team's score
+    const bankToAward = roundBank;
+    setRoundBank(0);
     setTeams((prev) =>
-      prev.map((t, idx) => (idx === activeTeamIdx ? { ...t, score: t.score + roundBank } : t))
+      prev.map((t, idx) => (idx === activeTeamIdx ? { ...t, score: t.score + bankToAward } : t))
     );
   };
 
   const handleNextPuzzle = () => {
     if (puzzleIdx >= puzzles.length - 1) {
+      setTimerRunning(false);
       setIsGameFinished(true);
       onEndGame(teams);
       return;
@@ -156,6 +181,8 @@ export function WheelFortuneHostView({ teams: initialTeams, onEndGame, onReturnT
     setGuessedLetters([]);
     setRoundBank(0);
     setCurrentWedge(null);
+    setIsPuzzleSolved(false);
+    setTimerRunning(false);
     setActiveTeamIdx((prev) => (prev + 1) % teams.length);
   };
 
@@ -199,6 +226,7 @@ export function WheelFortuneHostView({ teams: initialTeams, onEndGame, onReturnT
 
           <button
             onClick={() => {
+              setTimerRunning(false);
               setIsGameFinished(true);
               onEndGame(teams);
             }}
@@ -245,8 +273,8 @@ export function WheelFortuneHostView({ teams: initialTeams, onEndGame, onReturnT
             <div className="flex items-center gap-3">
               <button
                 onClick={handleSpinWheel}
-                disabled={isSpinning}
-                className="flex-1 py-3 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 disabled:opacity-50 text-slate-950 font-display font-black text-sm flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-95"
+                disabled={isSpinning || isPuzzleSolved}
+                className="flex-1 py-3 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 font-display font-black text-sm flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-95"
               >
                 <RotateCw className={`w-4 h-4 ${isSpinning ? 'animate-spin' : ''}`} />
                 {isSpinning ? 'Spinning Wheel...' : 'Spin The Wheel!'}
@@ -254,7 +282,8 @@ export function WheelFortuneHostView({ teams: initialTeams, onEndGame, onReturnT
 
               <button
                 onClick={handleSolvePuzzle}
-                className="py-3 px-6 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-display font-black text-sm flex items-center gap-2 shadow transition-transform active:scale-95"
+                disabled={isPuzzleSolved}
+                className="py-3 px-6 rounded-2xl bg-amber-400 hover:bg-amber-300 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 font-display font-black text-sm flex items-center gap-2 shadow transition-transform active:scale-95"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 Solve Verified!
@@ -270,13 +299,16 @@ export function WheelFortuneHostView({ teams: initialTeams, onEndGame, onReturnT
                 {ALPHABET.map((letter) => {
                   const isUsed = guessedLetters.includes(letter);
                   const isVowel = VOWELS.includes(letter);
+                  const cannotAffordVowel = isVowel && roundBank < 250;
+                  const isDisabled = isPuzzleSolved || isUsed || cannotAffordVowel;
                   return (
                     <button
                       key={letter}
                       onClick={() => handleGuessLetter(letter)}
-                      disabled={isUsed}
+                      disabled={isDisabled}
+                      title={cannotAffordVowel && !isUsed ? 'Need $250 in Round Pot to buy a vowel' : undefined}
                       className={`h-10 rounded-xl font-display font-black text-sm transition-all flex items-center justify-center border ${
-                        isUsed
+                        isDisabled
                           ? 'bg-slate-950 text-slate-700 border-slate-900 cursor-not-allowed'
                           : isVowel
                           ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/40 hover:scale-105 active:scale-95'
@@ -319,9 +351,12 @@ export function WheelFortuneHostView({ teams: initialTeams, onEndGame, onReturnT
           gameTitle="Wheel of Fortune Champions"
           onPlayAgain={() => {
             setIsGameFinished(false);
+            setIsPuzzleSolved(false);
+            setTimerRunning(false);
             setPuzzleIdx(0);
             setGuessedLetters([]);
             setRoundBank(0);
+            setCurrentWedge(null);
             setTeams((prev) => prev.map((t) => ({ ...t, score: 0 })));
           }}
           onReturnToHub={onReturnToHub}

@@ -18,6 +18,7 @@ import { listQuestionPacks, saveQuestionPack, deleteQuestionPack, initializeData
 import { QuestionPackSchema } from '../types/game';
 import type { QuestionPack } from '../types/game';
 import { getPackTheme } from '../data/filipinoPacks/packTheme';
+import { escapeHtml } from '../utils/sanitize';
 
 export function PackLibraryPage() {
   const { navigate } = useRouter();
@@ -110,8 +111,16 @@ export function PackLibraryPage() {
   };
 
   const handleDelete = async (pack: QuestionPack) => {
+    if (pack.isBuiltIn) {
+      showNotification(`"${pack.title}" is a built-in pack and cannot be deleted.`, 'error');
+      return;
+    }
     if (confirm(`Are you sure you want to delete "${pack.title}"?`)) {
-      await deleteQuestionPack(pack.id);
+      const deleted = await deleteQuestionPack(pack.id);
+      if (!deleted) {
+        showNotification(`Could not delete "${pack.title}".`, 'error');
+        return;
+      }
       await loadPacks();
       showNotification(`Deleted pack "${pack.title}".`);
     }
@@ -168,11 +177,14 @@ export function PackLibraryPage() {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
+    const safeTitle = escapeHtml(pack.title);
+    const safeDesc = escapeHtml(pack.description);
+
     const html = `
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Host Question Sheet - ${pack.title}</title>
+        <title>Host Question Sheet - ${safeTitle}</title>
         <style>
           body { font-family: system-ui, sans-serif; padding: 2rem; color: #111; line-height: 1.4; }
           h1 { margin-bottom: 0.2rem; }
@@ -187,15 +199,15 @@ export function PackLibraryPage() {
         </style>
       </head>
       <body>
-        <h1>${pack.title} — Host Question Sheet</h1>
-        <p class="pack-desc">${pack.description} · Total Questions: ${pack.questions.length}</p>
+        <h1>${safeTitle} — Host Question Sheet</h1>
+        <p class="pack-desc">${safeDesc} · Total Questions: ${pack.questions.length}</p>
         ${pack.questions
           .map(
             (q, i) => `
           <div class="question-card">
-            <div class="q-title">Q${i + 1}. "${q.prompt}"</div>
-            ${q.scriptureReference ? `<div style="font-size:0.85rem; color:#b45309; font-weight:bold; margin-bottom:4px;">📖 Scripture Reference: ${q.scriptureReference} ${q.questionType ? `· Format: ${q.questionType}` : ''} ${q.difficulty ? `(${q.difficulty})` : ''}</div>` : ''}
-            ${q.scriptureExplanation ? `<div style="font-size:0.82rem; color:#4b5563; margin-bottom:8px; font-style:italic;">${q.scriptureExplanation}</div>` : ''}
+            <div class="q-title">Q${i + 1}. "${escapeHtml(q.prompt)}"</div>
+            ${q.scriptureReference ? `<div style="font-size:0.85rem; color:#b45309; font-weight:bold; margin-bottom:4px;">📖 Scripture Reference: ${escapeHtml(q.scriptureReference)} ${q.questionType ? `· Format: ${escapeHtml(q.questionType)}` : ''} ${q.difficulty ? `(${escapeHtml(q.difficulty)})` : ''}</div>` : ''}
+            ${q.scriptureExplanation ? `<div style="font-size:0.82rem; color:#4b5563; margin-bottom:8px; font-style:italic;">${escapeHtml(q.scriptureExplanation)}</div>` : ''}
             <table class="answers-table">
               <thead>
                 <tr>
@@ -211,10 +223,10 @@ export function PackLibraryPage() {
                   <tr>
                     <td>${aIdx + 1}</td>
                     <td>
-                      <strong>${a.text}</strong>
-                      ${a.acceptedVariants && a.acceptedVariants.length ? `<div class="variants">Variants: ${a.acceptedVariants.join(', ')}</div>` : ''}
+                      <strong>${escapeHtml(a.text)}</strong>
+                      ${a.acceptedVariants && a.acceptedVariants.length ? `<div class="variants">Variants: ${a.acceptedVariants.map((v) => escapeHtml(v)).join(', ')}</div>` : ''}
                     </td>
-                    <td class="pts-col">${a.points}</td>
+                    <td class="pts-col">${Number.isFinite(a.points) ? a.points : 0}</td>
                   </tr>
                 `
                   )
@@ -438,8 +450,9 @@ export function PackLibraryPage() {
                     {/* Delete */}
                     <button
                       onClick={() => handleDelete(pack)}
-                      className="p-1.5 rounded-lg bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-900"
-                      title="Delete pack"
+                      disabled={pack.isBuiltIn}
+                      className="p-1.5 rounded-lg bg-red-950/60 hover:bg-red-900 disabled:opacity-40 disabled:cursor-not-allowed text-red-300 border border-red-900"
+                      title={pack.isBuiltIn ? 'Built-in packs cannot be deleted' : 'Delete pack'}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>

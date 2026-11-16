@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Trophy } from 'lucide-react';
 import { hubSyncBus } from '../../sync/hubSync';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
+import { TvFinalResultsBanner } from '../../components/shared/TvFinalResultsBanner';
 
 interface JeopardyTvCategory {
   id: string;
@@ -66,6 +67,10 @@ export function JeopardyTvView() {
     );
   }
 
+  if (state.isGameFinished) {
+    return <TvFinalResultsBanner gameTitle="Jeopardy!" teams={state.teams} />;
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col justify-between min-h-[85vh]">
       {/* Active Clue Overlay Mode */}
@@ -115,8 +120,8 @@ export function JeopardyTvView() {
         </div>
       ) : (
         /* Regular 5x5 TV Board */
-        <div className="my-6">
-          <div className="grid grid-cols-5 gap-3 bg-blue-950/40 p-4 rounded-3xl border-2 border-blue-800 shadow-2xl">
+        <div className="my-6 overflow-x-auto pb-2">
+          <div className="grid grid-cols-5 gap-3 bg-blue-950/40 p-4 rounded-3xl border-2 border-blue-800 shadow-2xl min-w-[560px]">
             {state.categories.map((cat) => (
               <div key={cat.id} className="space-y-3">
                 <div className="h-20 p-2 rounded-2xl bg-gradient-to-b from-blue-900 to-blue-950 text-center flex items-center justify-center font-display font-black text-sm sm:text-base text-amber-300 uppercase tracking-tight shadow border-2 border-blue-700">

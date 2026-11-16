@@ -121,6 +121,7 @@ export function PictionaryHostView({ teams: initialTeams, onEndGame, onReturnToH
   }, [currentWord, isWordRevealedOnTv, activeTeam, teams, isGameFinished]);
 
   const handleCorrectGuess = () => {
+    if (isWordRevealedOnTv || isGameFinished) return;
     setTeams((prev) =>
       prev.map((t, idx) =>
         idx === activeTeamIndex % prev.length ? { ...t, score: t.score + 25 } : t
@@ -249,7 +250,8 @@ export function PictionaryHostView({ teams: initialTeams, onEndGame, onReturnToH
 
           <button
             onClick={handleCorrectGuess}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold transition-colors active:scale-95 shadow"
+            disabled={isWordRevealedOnTv}
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold transition-colors active:scale-95 shadow"
           >
             <CheckCircle2 className="w-4 h-4" />
             Correct (+25 pts)

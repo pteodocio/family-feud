@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { MessageSquareQuote } from 'lucide-react';
 import { hubSyncBus } from '../../sync/hubSync';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
+import { TvFinalResultsBanner } from '../../components/shared/TvFinalResultsBanner';
 
 interface BluffTvChoice {
   id: string;
@@ -60,6 +61,10 @@ export function BluffTvView() {
         <p className="text-slate-400 mt-2">Waiting for Host to present trivia question...</p>
       </div>
     );
+  }
+
+  if (state.isGameFinished) {
+    return <TvFinalResultsBanner gameTitle="Bluff the Answer" teams={state.teams} />;
   }
 
   return (

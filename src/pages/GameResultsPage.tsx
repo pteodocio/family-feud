@@ -3,6 +3,7 @@ import { ArrowLeft, Printer, Trophy, RotateCcw } from 'lucide-react';
 import { useRouter } from '../router/Router';
 import { loadGameSession } from '../db/database';
 import { recordGameHistory } from '../db/hubDatabase';
+import { resolveMatchOutcome } from '../utils/winnerResolution';
 import type { GameSession } from '../types/game';
 
 interface GameResultsPageProps {
@@ -17,7 +18,10 @@ export function GameResultsPage({ gameId }: GameResultsPageProps) {
     loadGameSession(gameId).then((loaded) => {
       if (loaded) {
         setSession(loaded);
-        const champ = loaded.team1.score >= loaded.team2.score ? loaded.team1 : loaded.team2;
+        const outcome = resolveMatchOutcome([loaded.team1, loaded.team2]);
+        const champName = outcome.isTie
+          ? `Tie: ${loaded.team1.name} & ${loaded.team2.name}`
+          : outcome.winners[0].name;
         recordGameHistory({
           id: `feud_${loaded.id}`,
           gameId: 'family-feud',
@@ -26,11 +30,21 @@ export function GameResultsPage({ gameId }: GameResultsPageProps) {
           durationSeconds: 600,
           gameMode: 'team',
           participants: [
-            { id: loaded.team1.id, name: loaded.team1.name, score: loaded.team1.score, isWinner: loaded.team1.score >= loaded.team2.score },
-            { id: loaded.team2.id, name: loaded.team2.name, score: loaded.team2.score, isWinner: loaded.team2.score > loaded.team1.score },
+            {
+              id: loaded.team1.id,
+              name: loaded.team1.name,
+              score: loaded.team1.score,
+              isWinner: loaded.team1.score === outcome.topScore,
+            },
+            {
+              id: loaded.team2.id,
+              name: loaded.team2.name,
+              score: loaded.team2.score,
+              isWinner: loaded.team2.score === outcome.topScore,
+            },
           ],
-          winnerName: champ.name,
-          winnerScore: champ.score,
+          winnerName: champName,
+          winnerScore: outcome.topScore,
         }).catch(() => {});
       }
     });
@@ -45,8 +59,9 @@ export function GameResultsPage({ gameId }: GameResultsPageProps) {
     );
   }
 
-  const championTeam =
-    session.team1.score >= session.team2.score ? session.team1 : session.team2;
+  const outcome = resolveMatchOutcome([session.team1, session.team2]);
+  const team1Won = session.team1.score === outcome.topScore;
+  const team2Won = session.team2.score === outcome.topScore;
 
   const handlePrint = () => {
     window.print();
@@ -85,7 +100,7 @@ export function GameResultsPage({ gameId }: GameResultsPageProps) {
           </span>
 
           <h1 className="font-display font-black text-3xl sm:text-5xl text-white mb-2 text-glow-gold">
-            {championTeam.name} WINS!
+            {outcome.isTie ? 'TIE GAME!' : `${outcome.winners[0].name} WINS!`}
           </h1>
           <p className="text-blue-200 text-xs sm:text-sm">
             {session.title} · Played on {new Date(session.createdAt).toLocaleDateString()}
@@ -98,8 +113,10 @@ export function GameResultsPage({ gameId }: GameResultsPageProps) {
               <span className="font-display font-black text-4xl sm:text-5xl text-white">
                 {session.team1.score}
               </span>
-              {championTeam.id === session.team1.id && (
-                <span className="text-xs text-feud-gold font-bold block mt-1">★ Champion</span>
+              {team1Won && (
+                <span className="text-xs text-feud-gold font-bold block mt-1">
+                  {outcome.isTie ? '★ Co-Champion' : '★ Champion'}
+                </span>
               )}
             </div>
 
@@ -108,8 +125,10 @@ export function GameResultsPage({ gameId }: GameResultsPageProps) {
               <span className="font-display font-black text-4xl sm:text-5xl text-white">
                 {session.team2.score}
               </span>
-              {championTeam.id === session.team2.id && (
-                <span className="text-xs text-feud-gold font-bold block mt-1">★ Champion</span>
+              {team2Won && (
+                <span className="text-xs text-feud-gold font-bold block mt-1">
+                  {outcome.isTie ? '★ Co-Champion' : '★ Champion'}
+                </span>
               )}
             </div>
           </div>

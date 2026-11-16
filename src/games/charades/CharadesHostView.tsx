@@ -123,6 +123,7 @@ export function CharadesHostView({ teams: initialTeams, onEndGame, onReturnToHub
   }, [currentWord, isWordRevealedOnTv, activeTeam, teams, isGameFinished]);
 
   const handleCorrectGuess = () => {
+    if (isWordRevealedOnTv || isGameFinished) return;
     setTeams((prev) =>
       prev.map((t, idx) =>
         idx === activeTeamIndex % prev.length ? { ...t, score: t.score + currentWord.points } : t
@@ -285,7 +286,8 @@ export function CharadesHostView({ teams: initialTeams, onEndGame, onReturnToHub
 
           <button
             onClick={handleCorrectGuess}
-            className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold shadow-lg transition-transform active:scale-95"
+            disabled={isWordRevealedOnTv}
+            className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold shadow-lg transition-transform active:scale-95"
           >
             <CheckCircle2 className="w-5 h-5" />
             Guessed Correctly! (+{currentWord.points} pts)

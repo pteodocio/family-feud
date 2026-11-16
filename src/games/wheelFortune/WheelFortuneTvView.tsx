@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { RotateCw, Sparkles } from 'lucide-react';
 import { hubSyncBus } from '../../sync/hubSync';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
+import { TvFinalResultsBanner } from '../../components/shared/TvFinalResultsBanner';
 
 interface WheelTvState {
   gameId: string;
@@ -54,6 +55,10 @@ export function WheelFortuneTvView() {
         <p className="text-slate-400 mt-2">Waiting for Host to spin the wheel...</p>
       </div>
     );
+  }
+
+  if (state.isGameFinished) {
+    return <TvFinalResultsBanner gameTitle="Wheel of Fortune" teams={state.teams} />;
   }
 
   // Split phrase into words for clean wrapped lines

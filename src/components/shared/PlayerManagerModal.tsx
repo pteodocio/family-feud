@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, UserPlus, Trash2, Users, Shield, Shuffle, Sparkles, Dices, RotateCcw } from 'lucide-react';
 import type { HubPlayer, HubTeam } from '../../types/hub';
 import {
@@ -11,6 +11,7 @@ import {
 } from '../../db/hubDatabase';
 import { soundManager } from '../../audio/soundManager';
 import { fireConfetti } from '../../utils/confetti';
+import { shuffleArray } from '../../utils/shuffle';
 
 interface PlayerManagerModalProps {
   isOpen: boolean;
@@ -42,6 +43,7 @@ export function PlayerManagerModal({ isOpen, onClose, onUpdated }: PlayerManager
   const [highlightedPlayer, setHighlightedPlayer] = useState<HubPlayer | null>(null);
   const [pickedWinner, setPickedWinner] = useState<HubPlayer | null>(null);
   const [balanceFeedback, setBalanceFeedback] = useState<string | null>(null);
+  const pickerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadData = async () => {
     const [pList, tList] = await Promise.all([listHubPlayers(), listHubTeams()]);
@@ -54,7 +56,17 @@ export function PlayerManagerModal({ isOpen, onClose, onUpdated }: PlayerManager
       loadData();
       setPickedWinner(null);
       setBalanceFeedback(null);
+    } else if (pickerIntervalRef.current) {
+      clearInterval(pickerIntervalRef.current);
+      pickerIntervalRef.current = null;
+      setIsPickingPlayer(false);
     }
+    return () => {
+      if (pickerIntervalRef.current) {
+        clearInterval(pickerIntervalRef.current);
+        pickerIntervalRef.current = null;
+      }
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -64,22 +76,48 @@ export function PlayerManagerModal({ isOpen, onClose, onUpdated }: PlayerManager
     const trimmed = newPlayerName.trim();
     if (!trimmed) return;
 
+    if (players.some((p) => p.name.trim().toLowerCase() === trimmed.toLowerCase())) {
+      setBalanceFeedback(`Player "${trimmed}" already exists.`);
+      return;
+    }
+
+    const targetTeamId = newPlayerTeamId || null;
     const newP: HubPlayer = {
       id: `p_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
       name: trimmed,
       avatarColor: newPlayerColor,
-      teamId: newPlayerTeamId || null,
+      teamId: targetTeamId,
       createdAt: new Date().toISOString(),
     };
 
     await saveHubPlayer(newP);
+    if (targetTeamId) {
+      const targetTeam = teams.find((t) => t.id === targetTeamId);
+      if (targetTeam && !targetTeam.playerIds.includes(newP.id)) {
+        await saveHubTeam({
+          ...targetTeam,
+          playerIds: [...targetTeam.playerIds, newP.id],
+        });
+      }
+    }
     setNewPlayerName('');
+    setBalanceFeedback(null);
     await loadData();
     onUpdated?.();
   };
 
   const handleDeletePlayer = async (id: string) => {
+    const removed = players.find((p) => p.id === id);
     await deleteHubPlayer(id);
+    if (removed?.teamId) {
+      const parentTeam = teams.find((t) => t.id === removed.teamId);
+      if (parentTeam) {
+        await saveHubTeam({
+          ...parentTeam,
+          playerIds: parentTeam.playerIds.filter((pid) => pid !== id),
+        });
+      }
+    }
     await loadData();
     onUpdated?.();
   };
@@ -88,6 +126,11 @@ export function PlayerManagerModal({ isOpen, onClose, onUpdated }: PlayerManager
     e.preventDefault();
     const trimmed = newTeamName.trim();
     if (!trimmed) return;
+
+    if (teams.some((t) => t.name.trim().toLowerCase() === trimmed.toLowerCase())) {
+      setBalanceFeedback(`Team "${trimmed}" already exists.`);
+      return;
+    }
 
     const newT: HubTeam = {
       id: `t_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
@@ -99,12 +142,19 @@ export function PlayerManagerModal({ isOpen, onClose, onUpdated }: PlayerManager
 
     await saveHubTeam(newT);
     setNewTeamName('');
+    setBalanceFeedback(null);
     await loadData();
     onUpdated?.();
   };
 
   const handleDeleteTeam = async (id: string) => {
+    await Promise.all(
+      players
+        .filter((p) => p.teamId === id)
+        .map((p) => saveHubPlayer({ ...p, teamId: null }))
+    );
     await deleteHubTeam(id);
+    if (newPlayerTeamId === id) setNewPlayerTeamId('');
     await loadData();
     onUpdated?.();
   };
@@ -137,18 +187,27 @@ export function PlayerManagerModal({ isOpen, onClose, onUpdated }: PlayerManager
       currentTeams = [defaultBlue, defaultRed];
     }
 
-    // Shuffle players randomly using Fisher-Yates
-    const shuffled = [...players].sort(() => Math.random() - 0.5);
+    const shuffled = shuffleArray(players);
+    const teamPlayerMap = new Map<string, string[]>(currentTeams.map((t) => [t.id, []]));
 
     // Distribute round-robin among currentTeams
     for (let i = 0; i < shuffled.length; i++) {
       const assignedTeam = currentTeams[i % currentTeams.length];
-      const updatedPlayer: HubPlayer = {
+      teamPlayerMap.get(assignedTeam.id)?.push(shuffled[i].id);
+      await saveHubPlayer({
         ...shuffled[i],
         teamId: assignedTeam.id,
-      };
-      await saveHubPlayer(updatedPlayer);
+      });
     }
+
+    await Promise.all(
+      currentTeams.map((t) =>
+        saveHubTeam({
+          ...t,
+          playerIds: teamPlayerMap.get(t.id) || [],
+        })
+      )
+    );
 
     soundManager.playPartyCue('correct');
     setBalanceFeedback(`Balanced ${players.length} players evenly across ${currentTeams.length} teams!`);
@@ -160,6 +219,7 @@ export function PlayerManagerModal({ isOpen, onClose, onUpdated }: PlayerManager
   // Who Goes First / Random Player Selector
   const handlePickRandomPlayer = () => {
     if (players.length === 0 || isPickingPlayer) return;
+    if (pickerIntervalRef.current) clearInterval(pickerIntervalRef.current);
 
     setIsPickingPlayer(true);
     setPickedWinner(null);
@@ -168,14 +228,17 @@ export function PlayerManagerModal({ isOpen, onClose, onUpdated }: PlayerManager
     const maxSteps = 20;
     const intervalTime = 80;
 
-    const interval = setInterval(() => {
+    pickerIntervalRef.current = setInterval(() => {
       const randomIdx = Math.floor(Math.random() * players.length);
       setHighlightedPlayer(players[randomIdx]);
       soundManager.playPartyCue('tick');
       count++;
 
       if (count >= maxSteps) {
-        clearInterval(interval);
+        if (pickerIntervalRef.current) {
+          clearInterval(pickerIntervalRef.current);
+          pickerIntervalRef.current = null;
+        }
         const finalWinner = players[Math.floor(Math.random() * players.length)];
         setHighlightedPlayer(finalWinner);
         setPickedWinner(finalWinner);

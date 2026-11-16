@@ -114,15 +114,24 @@ export function DynamicContentGeneratorSection({
     }
   };
 
-  const handleGenerate = async (itemCount = count) => {
+  const handleGenerate = async (
+    itemCount = count,
+    overrides?: {
+      category?: string;
+      difficulty?: 'all' | 'easy' | 'medium' | 'hard';
+    }
+  ) => {
+    const activeCategory = overrides?.category ?? category;
+    const activeDifficulty = overrides?.difficulty ?? difficulty;
+    const catArg = activeCategory === 'All' ? undefined : activeCategory;
     setIsGenerating(true);
     setStatusMessage(null);
 
     try {
       if (gameId === 'family-trivia') {
         const res = await generateTriviaContent({
-          category: category === 'All' ? undefined : category,
-          difficulty,
+          category: catArg,
+          difficulty: activeDifficulty,
           count: itemCount,
           language,
           preferAi,
@@ -133,8 +142,8 @@ export function DynamicContentGeneratorSection({
         onContentReady(res.questions);
       } else if (gameId === 'charades') {
         const res = await generateCharadesContent({
-          category: category === 'All' ? undefined : category,
-          difficulty,
+          category: catArg,
+          difficulty: activeDifficulty,
           count: itemCount,
           language,
           preferAi,
@@ -145,8 +154,8 @@ export function DynamicContentGeneratorSection({
         onContentReady(res.words);
       } else if (gameId === 'pictionary') {
         const res = await generatePictionaryContent({
-          category: category === 'All' ? undefined : category,
-          difficulty,
+          category: catArg,
+          difficulty: activeDifficulty,
           count: itemCount,
           language,
           preferAi,
@@ -157,7 +166,7 @@ export function DynamicContentGeneratorSection({
         onContentReady(res.words);
       } else if (gameId === 'family-bingo') {
         const res = generateBingoContent({
-          theme: category === 'All' ? 'Classic 75-Ball Numbers' : category,
+          theme: activeCategory === 'All' ? 'Classic 75-Ball Numbers' : activeCategory,
           cardCount: itemCount,
         });
         setGeneratedItems(res.cards);
@@ -165,8 +174,8 @@ export function DynamicContentGeneratorSection({
         onContentReady(res.cards);
       } else if (gameId === 'guess-the-word') {
         const res = await generateGuessWordContent({
-          category: category === 'All' ? undefined : category,
-          difficulty,
+          category: catArg,
+          difficulty: activeDifficulty,
           count: itemCount,
           language,
           preferAi,
@@ -176,17 +185,17 @@ export function DynamicContentGeneratorSection({
         setGenerationSource(res.source);
         onContentReady(res.puzzles);
       } else if (gameId === 'password') {
-        const res = await generatePasswordContent({ count: itemCount, category: category === 'All' ? undefined : category });
+        const res = await generatePasswordContent({ count: itemCount, category: catArg });
         setGeneratedItems(res.words);
         setGenerationSource(res.source);
         onContentReady(res.words);
       } else if (gameId === 'catchphrase') {
-        const res = await generateCatchphraseContent({ count: itemCount, category: category === 'All' ? undefined : category });
+        const res = await generateCatchphraseContent({ count: itemCount, category: catArg });
         setGeneratedItems(res.phrases);
         setGenerationSource(res.source);
         onContentReady(res.phrases);
       } else if (gameId === 'taboo') {
-        const res = await generateTabooContent({ count: itemCount, category: category === 'All' ? undefined : category });
+        const res = await generateTabooContent({ count: itemCount, category: catArg });
         setGeneratedItems(res.cards);
         setGenerationSource(res.source);
         onContentReady(res.cards);
@@ -196,7 +205,7 @@ export function DynamicContentGeneratorSection({
         setGenerationSource('local');
         onContentReady(res.categories);
       } else if (gameId === 'wheel-of-fortune') {
-        const res = await generateWheelContent({ count: itemCount, category: category === 'All' ? undefined : category });
+        const res = await generateWheelContent({ count: itemCount, category: catArg });
         setGeneratedItems(res.puzzles);
         setGenerationSource(res.source);
         onContentReady(res.puzzles);
@@ -206,7 +215,7 @@ export function DynamicContentGeneratorSection({
         setGenerationSource(res.source);
         onContentReady(res.items);
       } else if (gameId === 'heads-up') {
-        const res = await generateHeadsUpContent({ count: itemCount, category: category === 'All' ? undefined : category });
+        const res = await generateHeadsUpContent({ count: itemCount, category: catArg });
         setGeneratedItems(res.cards);
         setGenerationSource(res.source);
         onContentReady(res.cards);
@@ -217,9 +226,9 @@ export function DynamicContentGeneratorSection({
         onContentReady([res]);
       } else if (gameId === 'scattergories') {
         const res = await generateScattergoriesContent();
-        setGeneratedItems(res.categories.map((c) => ({ letter: res.letter, category: c })));
+        setGeneratedItems([res]);
         setGenerationSource('local');
-        onContentReady(res.categories);
+        onContentReady([res]);
       } else if (gameId === 'trivia-elimination') {
         const res = await generateEliminationContent({ count: itemCount });
         setGeneratedItems(res.questions);
@@ -310,9 +319,16 @@ export function DynamicContentGeneratorSection({
     }
   };
 
-  // Initial automatic generation so the preview is immediately playable
+  // Reset controls and generate fresh preview whenever gameId switches
   useEffect(() => {
-    handleGenerate();
+    const defaultCount = gameId === 'family-bingo' ? 4 : 5;
+    setCategory('All');
+    setDifficulty('all');
+    setCount(defaultCount);
+    setSelectedBingoCardIdx(0);
+    setStatusMessage(null);
+    setGeneratedItems([]);
+    handleGenerate(defaultCount, { category: 'All', difficulty: 'all' });
   }, [gameId]);
 
   return (
@@ -763,6 +779,260 @@ export function DynamicContentGeneratorSection({
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Team Battle Games Previews */}
+        {gameId === 'password' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[380px] overflow-y-auto pr-1">
+            {generatedItems.map((item, idx) => (
+              <div
+                key={item.id || idx}
+                className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-2"
+              >
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-cyan-400">
+                    Secret Password · {item.category || 'General'}
+                  </span>
+                  <p className="font-display font-black text-sm text-white mt-0.5">{item.word}</p>
+                  {Array.isArray(item.sampleClues) && (
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      Clues: {item.sampleClues.join(', ')}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleRemoveItem(idx)}
+                  title="Remove item"
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {gameId === 'catchphrase' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[380px] overflow-y-auto pr-1">
+            {generatedItems.map((item, idx) => (
+              <div
+                key={item.id || idx}
+                className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-2"
+              >
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-orange-400">
+                    Catchphrase · {item.category || 'Phrase'}
+                  </span>
+                  <p className="font-bold text-sm text-white mt-0.5">{item.phrase}</p>
+                </div>
+                <button
+                  onClick={() => handleRemoveItem(idx)}
+                  title="Remove item"
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {gameId === 'taboo' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[380px] overflow-y-auto pr-1">
+            {generatedItems.map((card, idx) => (
+              <div
+                key={card.id || idx}
+                className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-start justify-between gap-2"
+              >
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-pink-400">
+                    Taboo Card · {card.category || 'Word'}
+                  </span>
+                  <p className="font-display font-black text-sm text-white mt-0.5">{card.target}</p>
+                  {Array.isArray(card.tabooWords) && (
+                    <p className="text-[10px] text-rose-300 mt-1">
+                      Forbidden: {card.tabooWords.join(', ')}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleRemoveItem(idx)}
+                  title="Remove item"
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {gameId === 'jeopardy' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[380px] overflow-y-auto pr-1">
+            {generatedItems.map((cat, idx) => (
+              <div
+                key={cat.id || idx}
+                className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-1.5"
+              >
+                <span className="text-[10px] font-black uppercase text-blue-400 block">
+                  Category #{idx + 1}
+                </span>
+                <p className="font-display font-bold text-sm text-white">{cat.name}</p>
+                <p className="text-[10px] text-slate-400">
+                  {Array.isArray(cat.questions) ? `${cat.questions.length} clues ($100–$500)` : '5 clues'}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {gameId === 'wheel-of-fortune' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[380px] overflow-y-auto pr-1">
+            {generatedItems.map((p, idx) => (
+              <div
+                key={p.id || idx}
+                className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-2"
+              >
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-emerald-400">
+                    Wheel Puzzle · {p.category || 'Phrase'}
+                  </span>
+                  <p className="font-mono font-bold text-xs text-white mt-0.5">{p.phrase}</p>
+                </div>
+                <button
+                  onClick={() => handleRemoveItem(idx)}
+                  title="Remove item"
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {gameId === 'bluff-the-answer' && (
+          <div className="grid grid-cols-1 gap-2.5 max-h-[380px] overflow-y-auto pr-1">
+            {generatedItems.map((item, idx) => (
+              <div
+                key={item.id || idx}
+                className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-start justify-between gap-2"
+              >
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-purple-400">
+                    Bluff Prompt #{idx + 1}
+                  </span>
+                  <p className="text-xs sm:text-sm font-medium text-white mt-0.5">{item.question}</p>
+                  <p className="text-[10px] text-emerald-400 font-bold mt-1">
+                    Truth: {item.trueAnswer}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleRemoveItem(idx)}
+                  title="Remove item"
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {gameId === 'heads-up' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[380px] overflow-y-auto pr-1">
+            {generatedItems.map((card, idx) => (
+              <div
+                key={card.id || idx}
+                className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-2"
+              >
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-yellow-400">
+                    Heads Up · {card.category || 'Card'}
+                  </span>
+                  <p className="font-bold text-sm text-white mt-0.5">{card.item}</p>
+                </div>
+                <button
+                  onClick={() => handleRemoveItem(idx)}
+                  title="Remove item"
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {gameId === 'word-hunt' && generatedItems[0]?.grid && (
+          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col items-center">
+            <span className="text-[10px] font-bold uppercase text-teal-400 mb-3">
+              Generated 4×4 Letter Matrix
+            </span>
+            <div className="grid grid-cols-4 gap-2 max-w-xs w-full">
+              {generatedItems[0].grid.flat().map((char: string, idx: number) => (
+                <div
+                  key={idx}
+                  className="aspect-square rounded-xl bg-slate-900 border border-teal-500/40 flex items-center justify-center font-display font-black text-lg text-white"
+                >
+                  {char}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {gameId === 'scattergories' && generatedItems[0]?.categories && (
+          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase text-rose-400">
+                Starting Letter: <strong className="text-lg text-white">"{generatedItems[0].letter}"</strong>
+              </span>
+              <span className="text-[10px] text-slate-400">
+                {generatedItems[0].categories.length} Categories Ready
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {generatedItems[0].categories.map((cat: string, idx: number) => (
+                <div
+                  key={idx}
+                  className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs font-semibold text-white"
+                >
+                  #{idx + 1} · {cat}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {gameId === 'trivia-elimination' && (
+          <div className="grid grid-cols-1 gap-2.5 max-h-[380px] overflow-y-auto pr-1">
+            {generatedItems.map((q, idx) => (
+              <div
+                key={q.id || idx}
+                className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-start justify-between gap-2"
+              >
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-red-400">
+                    Survival Q{idx + 1} · {q.difficulty || 'medium'}
+                  </span>
+                  <p className="text-xs sm:text-sm font-medium text-white mt-0.5">{q.question}</p>
+                  {Array.isArray(q.options) && (
+                    <p className="text-[10px] text-emerald-400 font-bold mt-1">
+                      Answer: {q.options[q.correctOptionIndex] || q.options[0]}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleRemoveItem(idx)}
+                  title="Remove item"
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
           </div>
         )}
       </div>

@@ -9,6 +9,7 @@ import { ScoreHeader } from '../components/display/ScoreHeader';
 import { AnswerSlotTile } from '../components/display/AnswerSlotTile';
 import { StrikeGraphic } from '../components/display/StrikeGraphic';
 import { FastMoneyBoard } from '../components/display/FastMoneyBoard';
+import { resolveMatchOutcome } from '../utils/winnerResolution';
 import confetti from 'canvas-confetti';
 
 interface DisplayPageProps {
@@ -347,9 +348,16 @@ export function DisplayPage({ gameId }: DisplayPageProps) {
                 GRAND VICTORY · FINAL RESULTS
               </span>
 
-              <h1 className="font-display font-black text-4xl sm:text-6xl md:text-7xl text-white mb-6 text-glow-gold tracking-wide">
-                🏆 {session.team1.score >= session.team2.score ? session.team1.name : session.team2.name} IS THE CHAMPION!
-              </h1>
+              {(() => {
+                const outcome = resolveMatchOutcome([session.team1, session.team2]);
+                return (
+                  <h1 className="font-display font-black text-4xl sm:text-6xl md:text-7xl text-white mb-6 text-glow-gold tracking-wide">
+                    {outcome.isTie
+                      ? '🏆 TIE GAME! SHARED CHAMPIONSHIP!'
+                      : `🏆 ${outcome.winners[0].name} IS THE CHAMPION!`}
+                  </h1>
+                );
+              })()}
 
               <div className="grid grid-cols-2 gap-8 w-full max-w-xl bg-black/60 border-2 border-feud-gold/70 rounded-3xl p-6 sm:p-8 my-4">
                 <div className="border-r border-blue-900/80 pr-4">

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Grid } from 'lucide-react';
 import { hubSyncBus } from '../../sync/hubSync';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
+import { TvFinalResultsBanner } from '../../components/shared/TvFinalResultsBanner';
 
 interface WordHuntTvState {
   gameId: string;
@@ -49,6 +50,10 @@ export function WordHuntTvView() {
         <p className="text-slate-400 mt-2">Waiting for Host to roll the letter grid...</p>
       </div>
     );
+  }
+
+  if (state.isGameFinished) {
+    return <TvFinalResultsBanner gameTitle="Word Hunt" teams={state.teams} />;
   }
 
   return (

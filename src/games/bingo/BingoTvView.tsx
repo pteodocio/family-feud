@@ -6,7 +6,11 @@ import { getBingoLetter, type BingoPattern } from '../../data/hubData/bingoPatte
 interface BingoTvState {
   gameId: string;
   calledNumbers: number[];
+  calledLabels?: string[];
   currentNumber: number | null;
+  currentLabel?: string | null;
+  isThemedMode?: boolean;
+  themedTotal?: number;
   selectedPattern: BingoPattern | null;
   winnerName: string | null;
   isGameFinished: boolean;
@@ -50,7 +54,17 @@ export function BingoTvView() {
     );
   }
 
-  const { calledNumbers, currentNumber, selectedPattern, winnerName, isGameFinished } = state;
+  const {
+    calledNumbers,
+    calledLabels = [],
+    currentNumber,
+    currentLabel,
+    isThemedMode,
+    themedTotal = 0,
+    selectedPattern,
+    winnerName,
+    isGameFinished,
+  } = state;
 
   return (
     <div className="min-h-screen bg-[#070501] text-white flex flex-col justify-between p-6 sm:p-10 select-none overflow-hidden">
@@ -70,22 +84,36 @@ export function BingoTvView() {
         </div>
 
         <div className="text-right">
-          <span className="text-xs text-slate-400 uppercase tracking-widest block">Numbers Called</span>
+          <span className="text-xs text-slate-400 uppercase tracking-widest block">
+            {isThemedMode ? 'Items Called' : 'Numbers Called'}
+          </span>
           <span className="text-base sm:text-lg font-black text-amber-300">
-            {calledNumbers.length} / 75
+            {isThemedMode ? `${calledLabels.length} / ${themedTotal}` : `${calledNumbers.length} / 75`}
           </span>
         </div>
       </div>
 
-      {/* Main Display: Caller Spotlight & 75-Number Master Grid */}
+      {/* Main Display: Caller Spotlight & Master Board */}
       <div className="flex-1 flex flex-col lg:flex-row items-center justify-center gap-8 max-w-6xl w-full mx-auto my-6">
         {/* Ball Spotlight */}
         <div className="flex flex-col items-center justify-center p-8 rounded-3xl bg-[#140e02] border-4 border-amber-400/80 shadow-2xl shadow-amber-500/20 text-center min-w-[280px]">
           <span className="text-xs font-black uppercase tracking-[0.25em] text-amber-400 mb-3">
-            Last Called Ball
+            {isThemedMode ? 'Last Called Item' : 'Last Called Ball'}
           </span>
 
-          {currentNumber ? (
+          {isThemedMode ? (
+            currentLabel ? (
+              <div className="px-8 py-10 rounded-3xl bg-gradient-to-b from-amber-300 to-amber-500 border-4 border-amber-100 flex items-center justify-center text-slate-950 shadow-2xl shadow-amber-500/50">
+                <span className="text-2xl sm:text-3xl font-display font-black uppercase">
+                  {currentLabel}
+                </span>
+              </div>
+            ) : (
+              <div className="w-40 h-40 rounded-full border-2 border-dashed border-amber-500/40 flex items-center justify-center text-sm text-amber-400/60 font-bold">
+                Waiting for Item
+              </div>
+            )
+          ) : currentNumber ? (
             <div className="w-40 h-40 rounded-full bg-gradient-to-b from-amber-300 to-amber-500 border-4 border-amber-100 flex flex-col items-center justify-center text-slate-950 shadow-2xl shadow-amber-500/50 animate-in zoom-in duration-200">
               <span className="text-3xl font-black leading-none">{getBingoLetter(currentNumber)}</span>
               <span className="text-7xl font-black font-mono leading-none">{currentNumber}</span>
@@ -100,68 +128,108 @@ export function BingoTvView() {
             {selectedPattern?.description}
           </div>
 
-          {/* Recent 5 Balls Reel */}
-          {calledNumbers.length > 1 && (
+          {/* Recent Reel */}
+          {((!isThemedMode && calledNumbers.length > 1) || (isThemedMode && calledLabels.length > 1)) && (
             <div className="mt-4 pt-3 border-t border-amber-900/60 w-full">
               <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400/80 block mb-1.5">
-                Recent Balls:
+                {isThemedMode ? 'Recent Items:' : 'Recent Balls:'}
               </span>
               <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                {calledNumbers.slice(-5).reverse().map((n, idx) => (
-                  <span
-                    key={idx}
-                    className={`px-2.5 py-1 rounded-lg text-xs sm:text-sm font-mono font-bold ${
-                      idx === 0
-                        ? 'bg-amber-400 text-slate-950 font-black shadow'
-                        : 'bg-amber-950/80 text-amber-300 border border-amber-800'
-                    }`}
-                  >
-                    {getBingoLetter(n)}{n}
-                  </span>
-                ))}
+                {isThemedMode
+                  ? calledLabels.slice(-5).reverse().map((lbl, idx) => (
+                      <span
+                        key={idx}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                          idx === 0
+                            ? 'bg-amber-400 text-slate-950 font-black shadow'
+                            : 'bg-amber-950/80 text-amber-300 border border-amber-800'
+                        }`}
+                      >
+                        {lbl}
+                      </span>
+                    ))
+                  : calledNumbers.slice(-5).reverse().map((n, idx) => (
+                      <span
+                        key={idx}
+                        className={`px-2.5 py-1 rounded-lg text-xs sm:text-sm font-mono font-bold ${
+                          idx === 0
+                            ? 'bg-amber-400 text-slate-950 font-black shadow'
+                            : 'bg-amber-950/80 text-amber-300 border border-amber-800'
+                        }`}
+                      >
+                        {getBingoLetter(n)}{n}
+                      </span>
+                    ))}
               </div>
             </div>
           )}
         </div>
 
-        {/* 75-Number Master Tracking Grid */}
+        {/* Tracking Grid */}
         <div className="flex-1 p-6 rounded-3xl bg-[#0c0903] border-2 border-amber-900/60 shadow-2xl w-full">
-          {/* B I N G O Row labels */}
-          <div className="space-y-3 font-mono">
-            {(['B', 'I', 'N', 'G', 'O'] as const).map((letter, rowIdx) => {
-              const start = rowIdx * 15 + 1;
-              const nums = Array.from({ length: 15 }, (_, i) => start + i);
+          {isThemedMode ? (
+            <div className="space-y-3">
+              <h3 className="text-xs font-black uppercase tracking-widest text-amber-400">
+                Called Items History
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {calledLabels.length === 0 ? (
+                  <p className="text-sm text-slate-400">Waiting for caller to draw the first item...</p>
+                ) : (
+                  calledLabels.map((lbl, idx) => (
+                    <span
+                      key={lbl}
+                      className={`px-3 py-1.5 rounded-xl text-sm font-bold border ${
+                        idx === calledLabels.length - 1
+                          ? 'bg-amber-400 text-slate-950 border-white font-black shadow-lg'
+                          : 'bg-amber-500/20 text-amber-200 border-amber-500/60'
+                      }`}
+                    >
+                      {lbl}
+                    </span>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto pb-1">
+              <div className="space-y-3 font-mono min-w-[560px]">
+                {(['B', 'I', 'N', 'G', 'O'] as const).map((letter, rowIdx) => {
+                  const start = rowIdx * 15 + 1;
+                  const nums = Array.from({ length: 15 }, (_, i) => start + i);
 
-              return (
-                <div key={letter} className="flex items-center gap-2">
-                  <span className="w-8 h-8 rounded-lg bg-amber-500 text-slate-950 font-black font-display text-sm flex items-center justify-center shadow">
-                    {letter}
-                  </span>
-                  <div className="grid grid-cols-15 gap-1.5 flex-1">
-                    {nums.map((n) => {
-                      const isCalled = calledNumbers.includes(n);
-                      const isLatest = currentNumber === n;
+                  return (
+                    <div key={letter} className="flex items-center gap-2">
+                      <span className="w-8 h-8 rounded-lg bg-amber-500 text-slate-950 font-black font-display text-sm flex items-center justify-center shadow">
+                        {letter}
+                      </span>
+                      <div className="grid grid-cols-15 gap-1.5 flex-1">
+                        {nums.map((n) => {
+                          const isCalled = calledNumbers.includes(n);
+                          const isLatest = currentNumber === n;
 
-                      return (
-                        <div
-                          key={n}
-                          className={`h-9 flex items-center justify-center rounded-lg border font-bold text-xs sm:text-sm transition-all ${
-                            isLatest
-                              ? 'bg-amber-400 text-slate-950 border-white ring-2 ring-amber-300 scale-110 font-black shadow-lg shadow-amber-500/50'
-                              : isCalled
-                              ? 'bg-amber-500/30 text-amber-300 border-amber-500/80'
-                              : 'bg-slate-950/70 text-slate-600 border-slate-900'
-                          }`}
-                        >
-                          {n}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                          return (
+                            <div
+                              key={n}
+                              className={`h-9 flex items-center justify-center rounded-lg border font-bold text-xs sm:text-sm transition-all ${
+                                isLatest
+                                  ? 'bg-amber-400 text-slate-950 border-white ring-2 ring-amber-300 scale-110 font-black shadow-lg shadow-amber-500/50'
+                                  : isCalled
+                                  ? 'bg-amber-500/30 text-amber-300 border-amber-500/80'
+                                  : 'bg-slate-950/70 text-slate-600 border-slate-900'
+                              }`}
+                            >
+                              {n}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

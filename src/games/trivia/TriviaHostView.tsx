@@ -114,8 +114,17 @@ export function TriviaHostView({ teams: initialTeams, onEndGame, onReturnToHub }
         category: selectedCategory === 'All' ? undefined : selectedCategory,
       });
       if (fresh) {
-        setQuestions((prev) => [...prev, fresh]);
-        setQuestionIndex(questions.length);
+        const alignedFresh =
+          selectedCategory === 'All' || fresh.category === selectedCategory
+            ? fresh
+            : { ...fresh, category: selectedCategory };
+        const updatedAll = [...questions, alignedFresh];
+        const nextFiltered =
+          selectedCategory === 'All'
+            ? updatedAll
+            : updatedAll.filter((q) => q.category === selectedCategory);
+        setQuestions(updatedAll);
+        setQuestionIndex(Math.max(0, nextFiltered.length - 1));
         setIsAnswerRevealed(false);
         setTimerRunning(false);
       }

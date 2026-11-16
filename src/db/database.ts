@@ -1,7 +1,60 @@
 import Dexie, { type Table } from 'dexie';
-import type { GameSession, QuestionPack, GameConfig } from '../types/game';
+import {
+  QuestionPackSchema,
+  GameConfigSchema,
+  type GameSession,
+  type QuestionPack,
+  type GameConfig,
+} from '../types/game';
 import type { HubPlayer, HubTeam, HubGameHistoryEntry } from '../types/hub';
 import { FILIPINO_BUILTIN_PACKS } from '../data/filipinoPacks';
+
+const BUILTIN_PACK_IDS = new Set(FILIPINO_BUILTIN_PACKS.map((p) => p.id));
+
+function clampUnit(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.min(1, Math.max(0, value))
+    : fallback;
+}
+
+function sanitizeImportedSettings(raw: unknown): AppSettings {
+  if (!raw || typeof raw !== 'object') return DEFAULT_SETTINGS;
+  const obj = raw as Record<string, unknown>;
+  const audioDestinations: AppSettings['audioDestination'][] = ['auto', 'tv_only', 'host_only', 'both'];
+  const aspectRatios: AppSettings['tvAspectRatio'][] = ['16:9', '4:3', 'auto'];
+  const parsedConfig = GameConfigSchema.safeParse(obj.defaultConfig);
+
+  return {
+    id: 'global_settings',
+    soundEnabled: typeof obj.soundEnabled === 'boolean' ? obj.soundEnabled : DEFAULT_SETTINGS.soundEnabled,
+    masterVolume: clampUnit(obj.masterVolume, DEFAULT_SETTINGS.masterVolume),
+    effectsVolume: clampUnit(obj.effectsVolume, DEFAULT_SETTINGS.effectsVolume),
+    bgmVolume: clampUnit(obj.bgmVolume, DEFAULT_SETTINGS.bgmVolume),
+    bgmEnabled: typeof obj.bgmEnabled === 'boolean' ? obj.bgmEnabled : DEFAULT_SETTINGS.bgmEnabled,
+    effectsEnabled: typeof obj.effectsEnabled === 'boolean' ? obj.effectsEnabled : DEFAULT_SETTINGS.effectsEnabled,
+    audioDestination: audioDestinations.includes(obj.audioDestination as AppSettings['audioDestination'])
+      ? (obj.audioDestination as AppSettings['audioDestination'])
+      : DEFAULT_SETTINGS.audioDestination,
+    autoRevealOnAllDone:
+      typeof obj.autoRevealOnAllDone === 'boolean'
+        ? obj.autoRevealOnAllDone
+        : DEFAULT_SETTINGS.autoRevealOnAllDone,
+    strikeSoundKey:
+      typeof obj.strikeSoundKey === 'string' && obj.strikeSoundKey.trim()
+        ? obj.strikeSoundKey
+        : DEFAULT_SETTINGS.strikeSoundKey,
+    keyboardShortcutsEnabled:
+      typeof obj.keyboardShortcutsEnabled === 'boolean'
+        ? obj.keyboardShortcutsEnabled
+        : DEFAULT_SETTINGS.keyboardShortcutsEnabled,
+    highContrastMode:
+      typeof obj.highContrastMode === 'boolean' ? obj.highContrastMode : DEFAULT_SETTINGS.highContrastMode,
+    tvAspectRatio: aspectRatios.includes(obj.tvAspectRatio as AppSettings['tvAspectRatio'])
+      ? (obj.tvAspectRatio as AppSettings['tvAspectRatio'])
+      : DEFAULT_SETTINGS.tvAspectRatio,
+    defaultConfig: parsedConfig.success ? parsedConfig.data : DEFAULT_SETTINGS.defaultConfig,
+  };
+}
 
 export interface AppSettings {
   id: string; // 'global_settings'
@@ -92,16 +145,16 @@ export const db = new FeudDatabase();
 /**
  * Initializes database and ensures default settings and built-in Filipino packs exist.
  */
-export async function initializeDatabase(): Promise<void> {
+export async function initializeDatabase(forceResetBuiltIns: boolean = false): Promise<void> {
   try {
     const currentSettings = await db.settings.get('global_settings');
-    if (!currentSettings) {
+    if (forceResetBuiltIns || !currentSettings) {
       await db.settings.put(DEFAULT_SETTINGS);
     }
 
-    // Seed built-in Filipino question packs if not yet present in IndexedDB
+    // Seed built-in Filipino question packs if not yet present (or explicitly reset)
     for (const pack of FILIPINO_BUILTIN_PACKS) {
-      const existing = await db.questionPacks.get(pack.id);
+      const existing = forceResetBuiltIns ? undefined : await db.questionPacks.get(pack.id);
       if (!existing) {
         await db.questionPacks.put(pack);
       }
@@ -212,7 +265,7 @@ export async function loadQuestionPack(id: string): Promise<QuestionPack | undef
  */
 export async function deleteQuestionPack(id: string): Promise<boolean> {
   const pack = await db.questionPacks.get(id);
-  if (!pack) return false;
+  if (!pack || pack.isBuiltIn || BUILTIN_PACK_IDS.has(pack.id)) return false;
   await db.questionPacks.delete(id);
   return true;
 }
@@ -261,23 +314,35 @@ export async function exportUserData(): Promise<string> {
 export async function importUserData(jsonString: string): Promise<{ success: boolean; count: number; error?: string }> {
   try {
     const data = JSON.parse(jsonString);
-    if (!data || !Array.isArray(data.packs)) {
+    if (!data || typeof data !== 'object' || !Array.isArray(data.packs)) {
       return { success: false, count: 0, error: 'Invalid backup file format: missing packs array' };
     }
 
-    let count = 0;
-    for (const pack of data.packs) {
-      if (pack.id && pack.title && Array.isArray(pack.questions)) {
-        await db.questionPacks.put(pack);
-        count++;
+    const validPacks: QuestionPack[] = [];
+    for (const rawPack of data.packs) {
+      const parsed = QuestionPackSchema.safeParse(rawPack);
+      if (parsed.success) {
+        validPacks.push({
+          ...parsed.data,
+          // Never allow imported custom packs to mark themselves immutable/built-in
+          isBuiltIn: BUILTIN_PACK_IDS.has(parsed.data.id),
+        });
       }
     }
 
-    if (data.settings) {
-      await db.settings.put({ ...DEFAULT_SETTINGS, ...data.settings, id: 'global_settings' });
+    if (data.packs.length > 0 && validPacks.length === 0) {
+      return { success: false, count: 0, error: 'Backup contains no valid question packs' };
     }
 
-    return { success: true, count };
+    for (const pack of validPacks) {
+      await db.questionPacks.put(pack);
+    }
+
+    if (data.settings) {
+      await db.settings.put(sanitizeImportedSettings(data.settings));
+    }
+
+    return { success: true, count: validPacks.length };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown parsing error';
     return { success: false, count: 0, error: message };

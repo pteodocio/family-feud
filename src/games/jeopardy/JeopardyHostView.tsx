@@ -1,11 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { CheckCircle2, XCircle, Eye, Trophy } from 'lucide-react';
-import { generateProceduralJeopardy, type JeopardyBoard, type JeopardyQuestion } from '../../services/localGenerators/jeopardyGenerator';
+import {
+  generateProceduralJeopardy,
+  type JeopardyBoard,
+  type JeopardyCategory,
+  type JeopardyQuestion,
+} from '../../services/localGenerators/jeopardyGenerator';
 import { SharedTimer } from '../../components/shared/SharedTimer';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
 import { WinnerPodiumModal } from '../../components/shared/WinnerPodiumModal';
 import { hubSyncBus } from '../../sync/hubSync';
 import { soundManager } from '../../audio/soundManager';
+import { loadCustomHubContent } from '../../utils/hubContentLoader';
+import { useHubHostSync } from '../../utils/useHubHostSync';
 
 interface JeopardyHostViewProps {
   teams: ScoreboardParticipant[];
@@ -32,19 +39,31 @@ export function JeopardyHostView({ teams: initialTeams, onEndGame, onReturnToHub
   const [selectedBuzzedTeamId, setSelectedBuzzedTeamId] = useState<string>('');
   const [dailyDoubleWager, setDailyDoubleWager] = useState<number>(500);
   const [isAnswerRevealed, setIsAnswerRevealed] = useState(false);
+  const [isCurrentClueScored, setIsCurrentClueScored] = useState(false);
   const [timerRunning, setTimerRunning] = useState(false);
   const [isGameFinished, setIsGameFinished] = useState(false);
 
   useEffect(() => {
+    const custom = loadCustomHubContent<JeopardyCategory | JeopardyBoard>('jeopardy');
     generateProceduralJeopardy().then((b) => {
+      if (custom) {
+        const first = custom[0] as any;
+        if (first && Array.isArray(first.categories)) {
+          setBoard({ ...b, categories: first.categories });
+          return;
+        }
+        if (custom.every((c: any) => Array.isArray(c.questions))) {
+          setBoard({ ...b, categories: custom as JeopardyCategory[] });
+          return;
+        }
+      }
       setBoard(b);
     });
   }, []);
 
-  // Broadcast to TV
-  useEffect(() => {
-    if (!board) return;
-    hubSyncBus.broadcastStateUpdate({
+  const syncPayload = useMemo(() => {
+    if (!board) return null;
+    return {
       gameId: 'jeopardy',
       categories: board.categories.map((c) => ({
         id: c.id,
@@ -68,13 +87,15 @@ export function JeopardyHostView({ teams: initialTeams, onEndGame, onReturnToHub
         : null,
       teams,
       isGameFinished,
-    });
+    };
   }, [board, usedTileIds, activeQuestion, isAnswerRevealed, dailyDoubleWager, teams, isGameFinished]);
+  useHubHostSync(syncPayload);
 
   const handleSelectTile = (catName: string, q: JeopardyQuestion) => {
     if (usedTileIds.includes(q.id)) return;
     setActiveQuestion({ catName, question: q });
     setIsAnswerRevealed(false);
+    setIsCurrentClueScored(false);
     setSelectedBuzzedTeamId(teams[0]?.id || '');
     setDailyDoubleWager(q.value);
     setTimerRunning(false);
@@ -86,15 +107,17 @@ export function JeopardyHostView({ teams: initialTeams, onEndGame, onReturnToHub
   };
 
   const handleAwardPoints = (isCorrect: boolean) => {
-    if (!activeQuestion) return;
-    const value = activeQuestion.question.isDailyDouble
+    if (!activeQuestion || isCurrentClueScored) return;
+    const rawWager = activeQuestion.question.isDailyDouble
       ? dailyDoubleWager
       : activeQuestion.question.value;
+    const value = Number.isFinite(rawWager) ? Math.max(0, rawWager) : activeQuestion.question.value;
 
     if (isCorrect) {
       soundManager.playPartyCue('correct');
       hubSyncBus.broadcastSoundTrigger('correct');
       setIsAnswerRevealed(true);
+      setIsCurrentClueScored(true);
 
       setTeams((prev) =>
         prev.map((t) => (t.id === selectedBuzzedTeamId ? { ...t, score: t.score + value } : t))
@@ -115,6 +138,7 @@ export function JeopardyHostView({ teams: initialTeams, onEndGame, onReturnToHub
     }
     setActiveQuestion(null);
     setIsAnswerRevealed(false);
+    setIsCurrentClueScored(false);
     setTimerRunning(false);
   };
 
@@ -152,6 +176,7 @@ export function JeopardyHostView({ teams: initialTeams, onEndGame, onReturnToHub
 
           <button
             onClick={() => {
+              setTimerRunning(false);
               setIsGameFinished(true);
               onEndGame(teams);
             }}
@@ -163,34 +188,36 @@ export function JeopardyHostView({ teams: initialTeams, onEndGame, onReturnToHub
       </div>
 
       {/* Jeopardy 5x5 Board Grid */}
-      <div className="grid grid-cols-5 gap-3 bg-blue-950/40 p-4 rounded-3xl border border-blue-900 shadow-2xl">
-        {board.categories.map((cat) => (
-          <div key={cat.id} className="space-y-3">
-            {/* Category Header */}
-            <div className="h-16 p-2 rounded-2xl bg-blue-900 text-center flex items-center justify-center font-display font-black text-xs sm:text-sm text-amber-300 uppercase tracking-tight shadow border border-blue-700">
-              {cat.name}
-            </div>
+      <div className="overflow-x-auto pb-2">
+        <div className="grid grid-cols-5 gap-3 bg-blue-950/40 p-4 rounded-3xl border border-blue-900 shadow-2xl min-w-[540px]">
+          {board.categories.map((cat) => (
+            <div key={cat.id} className="space-y-3">
+              {/* Category Header */}
+              <div className="h-16 p-2 rounded-2xl bg-blue-900 text-center flex items-center justify-center font-display font-black text-xs sm:text-sm text-amber-300 uppercase tracking-tight shadow border border-blue-700">
+                {cat.name}
+              </div>
 
-            {/* 5 Questions */}
-            {cat.questions.map((q) => {
-              const isUsed = usedTileIds.includes(q.id);
-              return (
-                <button
-                  key={q.id}
-                  onClick={() => handleSelectTile(cat.name, q)}
-                  disabled={isUsed}
-                  className={`w-full h-14 rounded-2xl font-display font-black text-lg sm:text-xl transition-all flex items-center justify-center border shadow ${
-                    isUsed
-                      ? 'bg-slate-900/60 text-slate-600 border-slate-800 cursor-not-allowed'
-                      : 'bg-blue-800 hover:bg-blue-700 text-amber-400 border-blue-600 hover:scale-105 active:scale-95 shadow-blue-900/50'
-                  }`}
-                >
-                  {isUsed ? '—' : `$${q.value}`}
-                </button>
-              );
-            })}
-          </div>
-        ))}
+              {/* 5 Questions */}
+              {cat.questions.map((q) => {
+                const isUsed = usedTileIds.includes(q.id);
+                return (
+                  <button
+                    key={q.id}
+                    onClick={() => handleSelectTile(cat.name, q)}
+                    disabled={isUsed}
+                    className={`w-full h-14 rounded-2xl font-display font-black text-lg sm:text-xl transition-all flex items-center justify-center border shadow ${
+                      isUsed
+                        ? 'bg-slate-900/60 text-slate-600 border-slate-800 cursor-not-allowed'
+                        : 'bg-blue-800 hover:bg-blue-700 text-amber-400 border-blue-600 hover:scale-105 active:scale-95 shadow-blue-900/50'
+                    }`}
+                  >
+                    {isUsed ? '—' : `$${q.value}`}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Active Question Modal / Drawer */}
@@ -244,6 +271,36 @@ export function JeopardyHostView({ teams: initialTeams, onEndGame, onReturnToHub
             </button>
           </div>
 
+          {/* Daily Double Wager Input */}
+          {activeQuestion.question.isDailyDouble && (
+            <div className="my-4 p-4 rounded-2xl bg-amber-950/50 border border-amber-500/60 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <label
+                  htmlFor="daily-double-wager"
+                  className="text-xs font-black uppercase text-amber-300 block"
+                >
+                  Daily Double Wager ($)
+                </label>
+                <span className="text-[11px] text-amber-200/80">
+                  Set team wager before revealing or scoring this clue.
+                </span>
+              </div>
+              <input
+                id="daily-double-wager"
+                type="number"
+                min={100}
+                max={Math.max(1000, ...teams.map((t) => Math.max(0, t.score)))}
+                step={50}
+                value={dailyDoubleWager}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  if (Number.isFinite(val)) setDailyDoubleWager(Math.max(0, val));
+                }}
+                className="w-32 bg-slate-950 border border-amber-500/60 rounded-xl px-3 py-2 text-sm font-mono font-black text-amber-300 text-right"
+              />
+            </div>
+          )}
+
           {/* Awarding Team Points */}
           <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -262,21 +319,32 @@ export function JeopardyHostView({ teams: initialTeams, onEndGame, onReturnToHub
             </div>
 
             <div className="flex items-center gap-2 w-full sm:w-auto">
-              <button
-                onClick={() => handleAwardPoints(true)}
-                className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                Correct (+${activeQuestion.question.value})
-              </button>
+              {(() => {
+                const clueValue = activeQuestion.question.isDailyDouble
+                  ? dailyDoubleWager
+                  : activeQuestion.question.value;
+                return (
+                  <>
+                    <button
+                      onClick={() => handleAwardPoints(true)}
+                      disabled={isCurrentClueScored}
+                      className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      Correct (+${clueValue})
+                    </button>
 
-              <button
-                onClick={() => handleAwardPoints(false)}
-                className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow"
-              >
-                <XCircle className="w-4 h-4" />
-                Wrong (-${activeQuestion.question.value})
-              </button>
+                    <button
+                      onClick={() => handleAwardPoints(false)}
+                      disabled={isCurrentClueScored}
+                      className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow"
+                    >
+                      <XCircle className="w-4 h-4" />
+                      Wrong (-${clueValue})
+                    </button>
+                  </>
+                );
+              })()}
 
               <button
                 onClick={handleCloseActiveQuestion}

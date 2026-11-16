@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { CheckCircle2, XCircle, Smile } from 'lucide-react';
 import { generateProceduralHeadsUp, type HeadsUpCard } from '../../services/localGenerators/headsUpGenerator';
 import { SharedTimer } from '../../components/shared/SharedTimer';
@@ -6,6 +6,8 @@ import { SharedScoreboard, type ScoreboardParticipant } from '../../components/s
 import { WinnerPodiumModal } from '../../components/shared/WinnerPodiumModal';
 import { hubSyncBus } from '../../sync/hubSync';
 import { soundManager } from '../../audio/soundManager';
+import { loadCustomHubContent } from '../../utils/hubContentLoader';
+import { useHubHostSync } from '../../utils/useHubHostSync';
 
 interface HeadsUpHostViewProps {
   teams: ScoreboardParticipant[];
@@ -32,6 +34,11 @@ export function HeadsUpHostView({ teams: initialTeams, onEndGame, onReturnToHub 
   const [isGameFinished, setIsGameFinished] = useState(false);
 
   useEffect(() => {
+    const custom = loadCustomHubContent<HeadsUpCard>('heads-up');
+    if (custom) {
+      setCards(custom);
+      return;
+    }
     generateProceduralHeadsUp({ count: 25 }).then((res) => {
       setCards(res);
     });
@@ -43,9 +50,8 @@ export function HeadsUpHostView({ teams: initialTeams, onEndGame, onReturnToHub 
     category: 'Movies & Characters',
   };
 
-  // Broadcast to TV
-  useEffect(() => {
-    hubSyncBus.broadcastStateUpdate({
+  const syncPayload = useMemo(
+    () => ({
       gameId: 'heads-up',
       item: currentCard.item,
       category: currentCard.category,
@@ -55,18 +61,31 @@ export function HeadsUpHostView({ teams: initialTeams, onEndGame, onReturnToHub 
       passCount,
       teams,
       isGameFinished,
-    });
-  }, [currentCard, activeTeamIdx, correctCount, passCount, teams, isGameFinished]);
+    }),
+    [currentCard, activeTeamIdx, correctCount, passCount, teams, isGameFinished]
+  );
+  useHubHostSync(syncPayload);
+
+  const advanceCard = (latestTeams: ScoreboardParticipant[] = teams) => {
+    if (cardIdx >= cards.length - 1) {
+      setTimerRunning(false);
+      setIsGameFinished(true);
+      onEndGame(latestTeams);
+      return;
+    }
+    setCardIdx((prev) => prev + 1);
+  };
 
   const handleCorrect = () => {
     soundManager.playPartyCue('correct');
     hubSyncBus.broadcastSoundTrigger('correct');
 
     setCorrectCount((prev) => prev + 1);
-    setTeams((prev) =>
-      prev.map((t, idx) => (idx === activeTeamIdx ? { ...t, score: t.score + 1 } : t))
+    const updatedTeams = teams.map((t, idx) =>
+      idx === activeTeamIdx ? { ...t, score: t.score + 1 } : t
     );
-    advanceCard();
+    setTeams(updatedTeams);
+    advanceCard(updatedTeams);
   };
 
   const handlePass = () => {
@@ -74,16 +93,7 @@ export function HeadsUpHostView({ teams: initialTeams, onEndGame, onReturnToHub 
     hubSyncBus.broadcastSoundTrigger('wrong');
 
     setPassCount((prev) => prev + 1);
-    advanceCard();
-  };
-
-  const advanceCard = () => {
-    if (cardIdx >= cards.length - 1) {
-      setIsGameFinished(true);
-      onEndGame(teams);
-      return;
-    }
-    setCardIdx((prev) => prev + 1);
+    advanceCard(teams);
   };
 
   const handleSwitchTeam = () => {
@@ -126,6 +136,7 @@ export function HeadsUpHostView({ teams: initialTeams, onEndGame, onReturnToHub 
 
           <button
             onClick={() => {
+              setTimerRunning(false);
               setIsGameFinished(true);
               onEndGame(teams);
             }}
@@ -209,6 +220,7 @@ export function HeadsUpHostView({ teams: initialTeams, onEndGame, onReturnToHub 
           gameTitle="Heads Up! Champions"
           onPlayAgain={() => {
             setIsGameFinished(false);
+            setTimerRunning(false);
             setCardIdx(0);
             setCorrectCount(0);
             setPassCount(0);

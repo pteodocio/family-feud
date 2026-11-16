@@ -42,7 +42,7 @@ export async function testAiConnection(apiKey?: string): Promise<{ success: bool
 
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(key)}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -81,7 +81,7 @@ async function callGeminiJson<T>(prompt: string, apiKey?: string): Promise<T | n
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(key)}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -156,15 +156,33 @@ Each question must have exactly 4 plausible options, with correctOptionIndex bet
     return null;
   }
 
-  return parsed.questions.map((q, idx) => ({
-    id: `ai_triv_${Date.now()}_${idx}`,
-    category: q.category || config.category || 'General Trivia',
-    prompt: q.prompt,
-    options: Array.isArray(q.options) && q.options.length >= 2 ? q.options : ['Option 1', 'Option 2', 'Option 3', 'Option 4'],
-    correctOptionIndex: typeof q.correctOptionIndex === 'number' ? q.correctOptionIndex : 0,
-    explanation: q.explanation || 'Verified answer.',
-    difficulty: (q.difficulty as any) || 'medium',
-  }));
+  const normalizeDiff = (d: unknown): 'easy' | 'medium' | 'hard' =>
+    d === 'easy' || d === 'medium' || d === 'hard' ? d : 'medium';
+
+  const valid = parsed.questions
+    .filter((q) => typeof q?.prompt === 'string' && q.prompt.trim().length > 0)
+    .map((q, idx) => {
+      const options: string[] =
+        Array.isArray(q.options) && q.options.length >= 2
+          ? q.options.map((opt: unknown) => String(opt || '').trim()).filter(Boolean)
+          : ['Option 1', 'Option 2', 'Option 3', 'Option 4'];
+      const safeOptions = options.length >= 2 ? options : ['Option 1', 'Option 2'];
+      const rawIdx = typeof q.correctOptionIndex === 'number' && Number.isFinite(q.correctOptionIndex)
+        ? Math.floor(q.correctOptionIndex)
+        : 0;
+      const clampedIdx = Math.min(safeOptions.length - 1, Math.max(0, rawIdx));
+      return {
+        id: `ai_triv_${Date.now()}_${idx}`,
+        category: String(q.category || config.category || 'General Trivia'),
+        prompt: q.prompt.trim(),
+        options: safeOptions,
+        correctOptionIndex: clampedIdx,
+        explanation: String(q.explanation || 'Verified answer.'),
+        difficulty: normalizeDiff(q.difficulty),
+      };
+    });
+
+  return valid.length > 0 ? valid : null;
 }
 
 /**
@@ -201,17 +219,24 @@ Return JSON with this EXACT structure:
     return null;
   }
 
-  return parsed.prompts.map((p, idx) => {
-    const diff = (p.difficulty as 'easy' | 'medium' | 'hard') || 'medium';
-    const points = diff === 'easy' ? 1 : diff === 'medium' ? 2 : 3;
-    return {
-      id: `ai_ch_${Date.now()}_${idx}`,
-      word: p.word,
-      category: p.category || config.category || 'Charades',
-      difficulty: diff,
-      points,
-    };
-  });
+  const normalizeDiff = (d: unknown): 'easy' | 'medium' | 'hard' =>
+    d === 'easy' || d === 'medium' || d === 'hard' ? d : 'medium';
+
+  const valid = parsed.prompts
+    .filter((p) => typeof p?.word === 'string' && p.word.trim().length > 0)
+    .map((p, idx) => {
+      const diff = normalizeDiff(p.difficulty);
+      const points = diff === 'easy' ? 1 : diff === 'medium' ? 2 : 3;
+      return {
+        id: `ai_ch_${Date.now()}_${idx}`,
+        word: p.word.trim(),
+        category: String(p.category || config.category || 'Charades'),
+        difficulty: diff,
+        points,
+      };
+    });
+
+  return valid.length > 0 ? valid : null;
 }
 
 /**
@@ -247,12 +272,19 @@ Return JSON with this EXACT structure:
     return null;
   }
 
-  return parsed.prompts.map((p, idx) => ({
-    id: `ai_pic_${Date.now()}_${idx}`,
-    word: p.word,
-    category: p.category || config.category || 'Pictionary',
-    difficulty: (p.difficulty as any) || 'medium',
-  }));
+  const normalizeDiff = (d: unknown): 'easy' | 'medium' | 'hard' =>
+    d === 'easy' || d === 'medium' || d === 'hard' ? d : 'medium';
+
+  const valid = parsed.prompts
+    .filter((p) => typeof p?.word === 'string' && p.word.trim().length > 0)
+    .map((p, idx) => ({
+      id: `ai_pic_${Date.now()}_${idx}`,
+      word: p.word.trim(),
+      category: String(p.category || config.category || 'Pictionary'),
+      difficulty: normalizeDiff(p.difficulty),
+    }));
+
+  return valid.length > 0 ? valid : null;
 }
 
 /**
@@ -300,18 +332,30 @@ Return JSON with this EXACT structure:
     return null;
   }
 
-  return parsed.puzzles.map((p, idx) => ({
-    id: `ai_gw_${Date.now()}_${idx}`,
-    word: p.word,
-    category: p.category || config.category || 'Word Clues',
-    difficulty: (p.difficulty as any) || 'medium',
-    clues: Array.isArray(p.clues) && p.clues.length >= 4
-      ? [p.clues[0], p.clues[1], p.clues[2], p.clues[3]]
-      : [
-          p.clues?.[0] || 'I am a familiar thing.',
-          p.clues?.[1] || 'You encounter me often in daily life.',
-          p.clues?.[2] || 'I have a recognizable shape and function.',
-          p.clues?.[3] || 'Look closely at my traits to guess my name.',
-        ],
-  }));
+  const normalizeDiff = (d: unknown): 'easy' | 'medium' | 'hard' =>
+    d === 'easy' || d === 'medium' || d === 'hard' ? d : 'medium';
+
+  const valid = parsed.puzzles
+    .filter((p) => typeof p?.word === 'string' && p.word.trim().length > 0)
+    .map((p, idx) => ({
+      id: `ai_gw_${Date.now()}_${idx}`,
+      word: p.word.trim(),
+      category: String(p.category || config.category || 'Word Clues'),
+      difficulty: normalizeDiff(p.difficulty),
+      clues: (Array.isArray(p.clues) && p.clues.length >= 4
+        ? [
+            String(p.clues[0] || 'I am a familiar thing.'),
+            String(p.clues[1] || 'You encounter me often in daily life.'),
+            String(p.clues[2] || 'I have a recognizable shape and function.'),
+            String(p.clues[3] || 'Look closely at my traits to guess my name.'),
+          ]
+        : [
+            String(p.clues?.[0] || 'I am a familiar thing.'),
+            String(p.clues?.[1] || 'You encounter me often in daily life.'),
+            String(p.clues?.[2] || 'I have a recognizable shape and function.'),
+            String(p.clues?.[3] || 'Look closely at my traits to guess my name.'),
+          ]) as [string, string, string, string],
+    }));
+
+  return valid.length > 0 ? valid : null;
 }

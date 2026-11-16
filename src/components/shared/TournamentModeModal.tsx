@@ -8,6 +8,7 @@ import {
 } from '../../services/tournamentManager';
 import { GAMES_CATALOG } from '../../games/registry';
 import { triggerConfetti } from '../../utils/confetti';
+import { resolveMatchOutcome } from '../../utils/winnerResolution';
 import { soundManager } from '../../audio/soundManager';
 import type { GameCatalogId } from '../../types/hub';
 
@@ -94,30 +95,68 @@ export function TournamentModeModal({
           </button>
         </div>
 
-        {/* VIEW 1: ACTIVE TOURNAMENT IN PROGRESS */}
+        {/* VIEW 1: ACTIVE TOURNAMENT IN PROGRESS OR COMPLETED */}
         {activeSession ? (
           <div className="space-y-6">
-            <div className="p-4 rounded-2xl bg-amber-950/40 border border-amber-500/60 flex items-center justify-between">
-              <div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-amber-400">
-                  Championship In Progress
-                </span>
-                <h4 className="font-display font-bold text-lg text-white">
-                  {activeSession.title}
-                </h4>
-                <p className="text-xs text-slate-300 mt-0.5">
-                  Next Up: <strong>{activeSession.rounds[activeSession.currentRoundIndex]?.gameName}</strong> (Round {activeSession.currentRoundIndex + 1} of {activeSession.rounds.length})
-                </p>
-              </div>
+            {(() => {
+              if (activeSession.isFinished) {
+                const outcome = resolveMatchOutcome(
+                  activeSession.standings.map((s) => ({
+                    name: s.teamName,
+                    score: s.totalScore,
+                  }))
+                );
+                return (
+                  <div className="p-4 rounded-2xl bg-emerald-950/50 border border-emerald-500/60 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">
+                        Championship Complete!
+                      </span>
+                      <h4 className="font-display font-bold text-lg text-white">
+                        {activeSession.title}
+                      </h4>
+                      <p className="text-xs text-emerald-200 mt-0.5">
+                        {outcome.isTie
+                          ? `Tie Game! Co-Champions: ${outcome.winners.map((w) => w.name).join(' & ')}`
+                          : `Tournament Champion: ${outcome.winners[0]?.name || 'Complete'}`}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        clearActiveTournament();
+                        setActiveSession(null);
+                      }}
+                      className="px-4 py-2 rounded-xl font-display font-black text-xs bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md"
+                    >
+                      New Tournament
+                    </button>
+                  </div>
+                );
+              }
+              return (
+                <div className="p-4 rounded-2xl bg-amber-950/40 border border-amber-500/60 flex items-center justify-between gap-3">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-400">
+                      Championship In Progress
+                    </span>
+                    <h4 className="font-display font-bold text-lg text-white">
+                      {activeSession.title}
+                    </h4>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      Next Up: <strong>{activeSession.rounds[activeSession.currentRoundIndex]?.gameName}</strong> (Round {activeSession.currentRoundIndex + 1} of {activeSession.rounds.length})
+                    </p>
+                  </div>
 
-              <button
-                onClick={handleLaunchCurrentRound}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-display font-black text-xs bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-md transition-transform active:scale-95"
-              >
-                <Play className="w-4 h-4 fill-current" />
-                Play Round →
-              </button>
-            </div>
+                  <button
+                    onClick={handleLaunchCurrentRound}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-display font-black text-xs bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-md transition-transform active:scale-95 shrink-0"
+                  >
+                    <Play className="w-4 h-4 fill-current" />
+                    Play Round →
+                  </button>
+                </div>
+              );
+            })()}
 
             {/* Standings Leaderboard */}
             <div className="space-y-2">

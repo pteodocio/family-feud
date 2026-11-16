@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Trophy, RotateCcw, Home } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { soundManager } from '../../audio/soundManager';
+import { resolveMatchOutcome } from '../../utils/winnerResolution';
 import type { ScoreboardParticipant } from './SharedScoreboard';
 
 interface WinnerPodiumModalProps {
@@ -33,9 +34,8 @@ export function WinnerPodiumModal({
 
   if (!isOpen) return null;
 
-  // Sort participants by score descending
-  const sorted = [...participants].sort((a, b) => b.score - a.score);
-  const winner = sorted[0];
+  const outcome = resolveMatchOutcome(participants);
+  const { sorted, topScore, winners, isTie, winnerLabel } = outcome;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-300">
@@ -53,12 +53,18 @@ export function WinnerPodiumModal({
         </span>
 
         <h2 className="font-display font-black text-3xl sm:text-4xl text-white tracking-tight drop-shadow-md">
-          {winner ? winner.name : 'Game Complete!'}
+          {sorted.length > 0 ? winnerLabel : 'Game Complete!'}
         </h2>
 
-        {winner && (
+        {isTie && (
+          <p className="text-xs font-bold text-amber-200 mt-1">
+            {winners.map((w) => w.name).join(' & ')}
+          </p>
+        )}
+
+        {sorted.length > 0 && (
           <div className="my-3 font-mono font-black text-2xl sm:text-3xl text-amber-400">
-            {winner.score} PTS
+            {topScore} PTS
           </div>
         )}
 
@@ -68,30 +74,33 @@ export function WinnerPodiumModal({
             Final Standings
           </h4>
           <div className="space-y-1.5">
-            {sorted.map((item, index) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between p-2 rounded-xl bg-slate-900/60 text-xs"
-              >
-                <div className="flex items-center gap-2 font-medium text-slate-200">
-                  <span
-                    className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                      index === 0
-                        ? 'bg-amber-400 text-slate-950'
-                        : index === 1
-                        ? 'bg-slate-300 text-slate-950'
-                        : index === 2
-                        ? 'bg-amber-700 text-white'
-                        : 'bg-slate-800 text-slate-400'
-                    }`}
-                  >
-                    {index + 1}
-                  </span>
-                  <span>{item.name}</span>
+            {sorted.map((item, index) => {
+              const isLeader = item.score === topScore;
+              return (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between p-2 rounded-xl bg-slate-900/60 text-xs"
+                >
+                  <div className="flex items-center gap-2 font-medium text-slate-200">
+                    <span
+                      className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                        isLeader
+                          ? 'bg-amber-400 text-slate-950'
+                          : index === 1
+                          ? 'bg-slate-300 text-slate-950'
+                          : index === 2
+                          ? 'bg-amber-700 text-white'
+                          : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      {isLeader ? 1 : index + 1}
+                    </span>
+                    <span>{item.name}</span>
+                  </div>
+                  <span className="font-mono font-bold text-slate-100">{item.score} pts</span>
                 </div>
-                <span className="font-mono font-bold text-slate-100">{item.score} pts</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 

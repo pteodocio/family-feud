@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { KeyRound, Sparkles } from 'lucide-react';
 import { hubSyncBus } from '../../sync/hubSync';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
+import { TvFinalResultsBanner } from '../../components/shared/TvFinalResultsBanner';
 
 interface PasswordTvState {
   gameId: string;
@@ -54,6 +55,10 @@ export function PasswordTvView() {
         <p className="text-slate-400 mt-2">Waiting for Host to start round...</p>
       </div>
     );
+  }
+
+  if (state.isGameFinished) {
+    return <TvFinalResultsBanner gameTitle="Password" teams={state.teams} />;
   }
 
   return (

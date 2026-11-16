@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Shuffle, Eye, MessageSquareQuote } from 'lucide-react';
 import { generateProceduralBluff, type BluffItem } from '../../services/localGenerators/bluffGenerator';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
@@ -6,6 +6,9 @@ import { SharedTimer } from '../../components/shared/SharedTimer';
 import { WinnerPodiumModal } from '../../components/shared/WinnerPodiumModal';
 import { hubSyncBus } from '../../sync/hubSync';
 import { soundManager } from '../../audio/soundManager';
+import { loadCustomHubContent } from '../../utils/hubContentLoader';
+import { useHubHostSync } from '../../utils/useHubHostSync';
+import { shuffleArray } from '../../utils/shuffle';
 
 interface BluffHostViewProps {
   teams: ScoreboardParticipant[];
@@ -33,6 +36,7 @@ export function BluffHostView({ teams: initialTeams, onEndGame, onReturnToHub }:
   const [items, setItems] = useState<BluffItem[]>([]);
   const [itemIdx, setItemIdx] = useState(0);
   const [teamBluffs, setTeamBluffs] = useState<Record<string, string>>({});
+  const [bluffError, setBluffError] = useState<string | null>(null);
   const [shuffledChoices, setShuffledChoices] = useState<BluffChoice[]>([]);
   const [isVotingActive, setIsVotingActive] = useState(false);
   const [isRevealed, setIsRevealed] = useState(false);
@@ -40,6 +44,11 @@ export function BluffHostView({ teams: initialTeams, onEndGame, onReturnToHub }:
   const [timerRunning, setTimerRunning] = useState(false);
 
   useEffect(() => {
+    const custom = loadCustomHubContent<BluffItem>('bluff-the-answer');
+    if (custom) {
+      setItems(custom);
+      return;
+    }
     generateProceduralBluff({ count: 5 }).then((res) => {
       setItems(res);
     });
@@ -53,15 +62,14 @@ export function BluffHostView({ teams: initialTeams, onEndGame, onReturnToHub }:
     suggestedBluffs: ['First Lieutenant', 'Navy Captain'],
   };
 
-  // Broadcast to TV
-  useEffect(() => {
-    hubSyncBus.broadcastStateUpdate({
+  const syncPayload = useMemo(
+    () => ({
       gameId: 'bluff-the-answer',
       question: currentItem.question,
       explanation: isRevealed ? currentItem.explanation : null,
       choices: shuffledChoices.map((c, idx) => ({
         id: c.id,
-        letter: String.fromCharCode(65 + idx), // A, B, C, D...
+        letter: String.fromCharCode(65 + idx),
         text: c.text,
         isTrue: isRevealed ? c.authorTeamId === 'TRUE_ANSWER' : false,
         authorTeamName: isRevealed
@@ -75,10 +83,29 @@ export function BluffHostView({ teams: initialTeams, onEndGame, onReturnToHub }:
       isRevealed,
       teams,
       isGameFinished,
-    });
-  }, [currentItem, shuffledChoices, isVotingActive, isRevealed, teams, isGameFinished]);
+    }),
+    [currentItem, shuffledChoices, isVotingActive, isRevealed, teams, isGameFinished]
+  );
+  useHubHostSync(syncPayload);
 
   const handleStartVoting = () => {
+    setBluffError(null);
+    const normalizedTruth = currentItem.trueAnswer.trim().toLowerCase();
+    const usedTexts = new Set<string>([normalizedTruth]);
+
+    // Check if any team manually typed the true answer or duplicate bluff
+    for (const t of teams) {
+      const entered = (teamBluffs[t.id] || '').trim();
+      if (entered && entered.toLowerCase() === normalizedTruth) {
+        setBluffError(`${t.name}'s bluff cannot match the true answer! Enter a fake answer instead.`);
+        return;
+      }
+    }
+
+    const availableSuggestions = (currentItem.suggestedBluffs || []).filter(
+      (s) => s.trim() && s.trim().toLowerCase() !== normalizedTruth
+    );
+
     const choices: BluffChoice[] = [
       {
         id: 'true_ans',
@@ -88,8 +115,16 @@ export function BluffHostView({ teams: initialTeams, onEndGame, onReturnToHub }:
       },
     ];
 
-    teams.forEach((t) => {
-      const bluffText = teamBluffs[t.id] || currentItem.suggestedBluffs?.[0] || 'Deceptive answer';
+    teams.forEach((t, idx) => {
+      const entered = (teamBluffs[t.id] || '').trim();
+      let bluffText = entered;
+      if (!bluffText) {
+        const unusedSuggestion = availableSuggestions.find(
+          (s) => !usedTexts.has(s.trim().toLowerCase())
+        );
+        bluffText = unusedSuggestion || `Mystery Decoy #${idx + 1}`;
+      }
+      usedTexts.add(bluffText.toLowerCase());
       choices.push({
         id: `bluff_${t.id}`,
         text: bluffText,
@@ -98,8 +133,7 @@ export function BluffHostView({ teams: initialTeams, onEndGame, onReturnToHub }:
       });
     });
 
-    const shuffled = choices.sort(() => Math.random() - 0.5);
-    setShuffledChoices(shuffled);
+    setShuffledChoices(shuffleArray(choices));
     setIsVotingActive(true);
     setIsRevealed(false);
 
@@ -192,6 +226,7 @@ export function BluffHostView({ teams: initialTeams, onEndGame, onReturnToHub }:
 
           <button
             onClick={() => {
+              setTimerRunning(false);
               setIsGameFinished(true);
               onEndGame(teams);
             }}
@@ -247,6 +282,12 @@ export function BluffHostView({ teams: initialTeams, onEndGame, onReturnToHub }:
                     />
                   </div>
                 ))}
+
+                {bluffError && (
+                  <p className="text-xs font-bold text-rose-400 bg-rose-950/60 border border-rose-800 rounded-xl px-3 py-2">
+                    {bluffError}
+                  </p>
+                )}
 
                 <button
                   onClick={handleStartVoting}
@@ -356,6 +397,8 @@ export function BluffHostView({ teams: initialTeams, onEndGame, onReturnToHub }:
           gameTitle="Bluff the Answer Champions"
           onPlayAgain={() => {
             setIsGameFinished(false);
+            setTimerRunning(false);
+            setBluffError(null);
             setItemIdx(0);
             setTeamBluffs({});
             setShuffledChoices([]);

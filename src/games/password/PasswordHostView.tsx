@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { CheckCircle2, ArrowRight, Eye, KeyRound, Sparkles } from 'lucide-react';
 import { generateProceduralPassword, type PasswordItem } from '../../services/localGenerators/passwordGenerator';
 import { SharedTimer } from '../../components/shared/SharedTimer';
@@ -6,6 +6,8 @@ import { SharedScoreboard, type ScoreboardParticipant } from '../../components/s
 import { WinnerPodiumModal } from '../../components/shared/WinnerPodiumModal';
 import { hubSyncBus } from '../../sync/hubSync';
 import { soundManager } from '../../audio/soundManager';
+import { loadCustomHubContent } from '../../utils/hubContentLoader';
+import { useHubHostSync } from '../../utils/useHubHostSync';
 
 interface PasswordHostViewProps {
   teams: ScoreboardParticipant[];
@@ -32,6 +34,11 @@ export function PasswordHostView({ teams: initialTeams, onEndGame, onReturnToHub
   const [isGameFinished, setIsGameFinished] = useState(false);
 
   useEffect(() => {
+    const custom = loadCustomHubContent<PasswordItem>('password');
+    if (custom) {
+      setWords(custom);
+      return;
+    }
     generateProceduralPassword({ count: 10 }).then((res) => {
       setWords(res);
     });
@@ -51,9 +58,8 @@ export function PasswordHostView({ teams: initialTeams, onEndGame, onReturnToHub
 
   const currentPoints = getPointsForClue(clueCount);
 
-  // Sync state to TV Display (AUDIENCE CONCEALMENT: hide secret word until isRevealed)
-  useEffect(() => {
-    hubSyncBus.broadcastStateUpdate({
+  const syncPayload = useMemo(
+    () => ({
       gameId: 'password',
       secretWord: isRevealed ? currentWord.word : null,
       isRevealed,
@@ -65,13 +71,17 @@ export function PasswordHostView({ teams: initialTeams, onEndGame, onReturnToHub
       activeTeamColor: teams[activeTeamIdx]?.color || 'blue',
       teams,
       isGameFinished,
-    });
-  }, [currentWord, isRevealed, clueCount, currentPoints, activeTeamIdx, teams, isGameFinished]);
+    }),
+    [currentWord, isRevealed, clueCount, currentPoints, activeTeamIdx, teams, isGameFinished]
+  );
+  useHubHostSync(syncPayload);
 
   const handleCorrectGuess = () => {
+    if (isRevealed || isGameFinished) return;
     soundManager.playPartyCue('correct');
     hubSyncBus.broadcastSoundTrigger('correct');
     setIsRevealed(true);
+    setTimerRunning(false);
 
     const updated = teams.map((t, idx) =>
       idx === activeTeamIdx ? { ...t, score: t.score + currentPoints } : t
@@ -90,6 +100,7 @@ export function PasswordHostView({ teams: initialTeams, onEndGame, onReturnToHub
 
   const handleNextWord = () => {
     if (wordIndex >= words.length - 1) {
+      setTimerRunning(false);
       setIsGameFinished(true);
       onEndGame(teams);
       return;
@@ -135,6 +146,7 @@ export function PasswordHostView({ teams: initialTeams, onEndGame, onReturnToHub
 
           <button
             onClick={() => {
+              setTimerRunning(false);
               setIsGameFinished(true);
               onEndGame(teams);
             }}

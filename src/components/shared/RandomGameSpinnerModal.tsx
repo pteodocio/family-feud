@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Play, RotateCcw, X, Dices } from 'lucide-react';
 import { GAMES_CATALOG } from '../../games/registry';
 import { soundManager } from '../../audio/soundManager';
@@ -19,35 +19,40 @@ export function RandomGameSpinnerModal({
   const [isSpinning, setIsSpinning] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [selectedGame, setSelectedGame] = useState<GameCatalogItem | null>(null);
+  const spinTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeRef = useRef(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      setSelectedGame(null);
-      setIsSpinning(false);
+  const clearSpinTimeout = () => {
+    if (spinTimeoutRef.current !== null) {
+      clearTimeout(spinTimeoutRef.current);
+      spinTimeoutRef.current = null;
     }
-  }, [isOpen]);
+  };
 
   const startSpin = () => {
+    clearSpinTimeout();
+    activeRef.current = true;
     setIsSpinning(true);
     setSelectedGame(null);
     soundManager.init();
 
     let speed = 60;
-    let currentIdx = 0;
+    let currentIdx = Math.floor(Math.random() * GAMES_CATALOG.length);
     let ticks = 0;
     const totalTicks = 25 + Math.floor(Math.random() * 15);
 
     const step = () => {
+      if (!activeRef.current) return;
       currentIdx = (currentIdx + 1) % GAMES_CATALOG.length;
       setHighlightedIndex(currentIdx);
       soundManager.playPartyCue('tick');
       ticks++;
 
       if (ticks < totalTicks) {
-        speed = Math.floor(speed * 1.07); // Slow down gradually
-        setTimeout(step, speed);
+        speed = Math.floor(speed * 1.07);
+        spinTimeoutRef.current = setTimeout(step, speed);
       } else {
-        // Landed!
+        spinTimeoutRef.current = null;
         const finalGame = GAMES_CATALOG[currentIdx];
         setSelectedGame(finalGame);
         setIsSpinning(false);
@@ -56,13 +61,22 @@ export function RandomGameSpinnerModal({
       }
     };
 
-    setTimeout(step, speed);
+    spinTimeoutRef.current = setTimeout(step, speed);
   };
 
   useEffect(() => {
     if (isOpen) {
       startSpin();
+    } else {
+      activeRef.current = false;
+      clearSpinTimeout();
+      setSelectedGame(null);
+      setIsSpinning(false);
     }
+    return () => {
+      activeRef.current = false;
+      clearSpinTimeout();
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { CheckCircle2, XCircle, Heart, ShieldAlert, ArrowRight } from 'lucide-react';
 import { generateProceduralElimination, type EliminationQuestion } from '../../services/localGenerators/eliminationGenerator';
 import { SharedTimer } from '../../components/shared/SharedTimer';
@@ -6,6 +6,8 @@ import { SharedScoreboard, type ScoreboardParticipant } from '../../components/s
 import { WinnerPodiumModal } from '../../components/shared/WinnerPodiumModal';
 import { hubSyncBus } from '../../sync/hubSync';
 import { soundManager } from '../../audio/soundManager';
+import { loadCustomHubContent } from '../../utils/hubContentLoader';
+import { useHubHostSync } from '../../utils/useHubHostSync';
 
 interface EliminationHostViewProps {
   teams: ScoreboardParticipant[];
@@ -26,7 +28,7 @@ export function EliminationHostView({ teams: initialTeams, onEndGame, onReturnTo
   const [teamLives, setTeamLives] = useState<Record<string, number>>(() => {
     const init: Record<string, number> = {};
     (initialTeams.length > 0 ? initialTeams : [{ id: 't1' }, { id: 't2' }]).forEach((t) => {
-      init[t.id] = 3; // 3 lives ❤️❤️❤️
+      init[t.id] = 3; // 3 lives
     });
     return init;
   });
@@ -36,11 +38,22 @@ export function EliminationHostView({ teams: initialTeams, onEndGame, onReturnTo
   const [isAnswerRevealed, setIsAnswerRevealed] = useState(false);
   const [timerRunning, setTimerRunning] = useState(false);
   const [isGameFinished, setIsGameFinished] = useState(false);
+  const finishTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    generateProceduralElimination({ count: 12 }).then((res) => {
-      setQuestions(res);
-    });
+    const custom = loadCustomHubContent<EliminationQuestion>('trivia-elimination');
+    if (custom) {
+      setQuestions(custom);
+    } else {
+      generateProceduralElimination({ count: 12 }).then((res) => {
+        setQuestions(res);
+      });
+    }
+    return () => {
+      if (finishTimeoutRef.current !== null) {
+        clearTimeout(finishTimeoutRef.current);
+      }
+    };
   }, []);
 
   const currentQ = questions[qIdx] || {
@@ -53,11 +66,10 @@ export function EliminationHostView({ teams: initialTeams, onEndGame, onReturnTo
   };
 
   // Check how many teams remain alive
-  const survivingTeams = teams.filter((t) => (teamLives[t.id] || 0) > 0);
+  const survivingTeams = teams.filter((t) => (teamLives[t.id] ?? 3) > 0);
 
-  // Broadcast to TV
-  useEffect(() => {
-    hubSyncBus.broadcastStateUpdate({
+  const syncPayload = useMemo(
+    () => ({
       gameId: 'trivia-elimination',
       question: currentQ.question,
       options: currentQ.options,
@@ -66,47 +78,77 @@ export function EliminationHostView({ teams: initialTeams, onEndGame, onReturnTo
       teamLives,
       teams,
       isGameFinished,
+    }),
+    [currentQ, isAnswerRevealed, teamLives, teams, isGameFinished]
+  );
+  useHubHostSync(syncPayload);
+
+  // Guarantee surviving teams always rank above eliminated teams in final standings/history
+  const buildSurvivorRankedScores = (
+    latestTeams: ScoreboardParticipant[],
+    livesMap: Record<string, number>
+  ): ScoreboardParticipant[] => {
+    const maxEliminatedScore = latestTeams
+      .filter((t) => (livesMap[t.id] ?? 3) === 0)
+      .reduce((max, t) => Math.max(max, t.score), 0);
+
+    return latestTeams.map((t) => {
+      const lives = livesMap[t.id] ?? 3;
+      if (lives > 0) {
+        const survivorBonus = maxEliminatedScore + lives * 250;
+        return { ...t, score: t.score + survivorBonus };
+      }
+      return t;
     });
-  }, [currentQ, isAnswerRevealed, teamLives, teams, isGameFinished]);
+  };
+
+  const concludeMatch = (
+    latestTeams: ScoreboardParticipant[],
+    livesMap: Record<string, number>
+  ) => {
+    const ranked = buildSurvivorRankedScores(latestTeams, livesMap);
+    setTeams(ranked);
+    setTimerRunning(false);
+    setIsGameFinished(true);
+    onEndGame(ranked);
+  };
 
   const handleDeductLife = (teamId: string) => {
     soundManager.playPartyCue('strike');
     hubSyncBus.broadcastSoundTrigger('strike');
 
-    setTeamLives((prev) => {
-      const nextLives = Math.max(0, (prev[teamId] || 3) - 1);
-      const updated = { ...prev, [teamId]: nextLives };
+    const nextLives = Math.max(0, (teamLives[teamId] ?? 3) - 1);
+    const updatedLives = { ...teamLives, [teamId]: nextLives };
+    setTeamLives(updatedLives);
 
-      // If only 1 team remains alive, award win
-      const alive = teams.filter((t) => (updated[t.id] || 0) > 0);
-      if (alive.length === 1) {
-        setTimeout(() => {
-          setIsGameFinished(true);
-          onEndGame(teams);
-        }, 800);
-      }
-
-      return updated;
-    });
+    const alive = teams.filter((t) => (updatedLives[t.id] ?? 3) > 0);
+    if (alive.length <= 1) {
+      if (finishTimeoutRef.current !== null) clearTimeout(finishTimeoutRef.current);
+      finishTimeoutRef.current = setTimeout(() => {
+        finishTimeoutRef.current = null;
+        concludeMatch(teams, updatedLives);
+      }, 800);
+    }
   };
 
   const handleRewardSurviving = () => {
+    if (isAnswerRevealed || isGameFinished) return;
     soundManager.playPartyCue('correct');
     hubSyncBus.broadcastSoundTrigger('correct');
     setIsAnswerRevealed(true);
+    setTimerRunning(false);
 
     // Each alive team gets 100 points
     setTeams((prev) =>
       prev.map((t) =>
-        (teamLives[t.id] || 0) > 0 ? { ...t, score: t.score + 100 } : t
+        (teamLives[t.id] ?? 3) > 0 ? { ...t, score: t.score + 100 } : t
       )
     );
   };
 
   const handleNextQuestion = () => {
     if (qIdx >= questions.length - 1 || survivingTeams.length <= 1) {
-      setIsGameFinished(true);
-      onEndGame(teams);
+      concludeMatch(teams, teamLives);
       return;
     }
     setQIdx((prev) => prev + 1);
@@ -147,10 +189,7 @@ export function EliminationHostView({ teams: initialTeams, onEndGame, onReturnTo
           />
 
           <button
-            onClick={() => {
-              setIsGameFinished(true);
-              onEndGame(teams);
-            }}
+            onClick={() => concludeMatch(teams, teamLives)}
             className="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-bold transition-colors"
           >
             End Game
@@ -242,7 +281,8 @@ export function EliminationHostView({ teams: initialTeams, onEndGame, onReturnTo
             <div className="pt-2 flex items-center gap-3">
               <button
                 onClick={handleRewardSurviving}
-                className="flex-1 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm flex items-center justify-center gap-2 shadow"
+                disabled={isAnswerRevealed}
+                className="flex-1 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-sm flex items-center justify-center gap-2 shadow"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 Reveal Answer & Reward Survivors (+100 pts)
@@ -273,10 +313,15 @@ export function EliminationHostView({ teams: initialTeams, onEndGame, onReturnTo
         <WinnerPodiumModal
           isOpen={isGameFinished}
           onClose={() => setIsGameFinished(false)}
-          participants={survivingTeams.length > 0 ? survivingTeams : teams}
+          participants={teams}
           gameTitle="Trivia Elimination Champions"
           onPlayAgain={() => {
+            if (finishTimeoutRef.current !== null) {
+              clearTimeout(finishTimeoutRef.current);
+              finishTimeoutRef.current = null;
+            }
             setIsGameFinished(false);
+            setTimerRunning(false);
             setQIdx(0);
             setIsAnswerRevealed(false);
             const resetLives: Record<string, number> = {};

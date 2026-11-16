@@ -225,6 +225,15 @@ export class HubSyncBus {
     return null;
   }
 
+  public clearTimerState(): void {
+    this.lastTimer = null;
+    try {
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('hub_last_timer');
+      }
+    } catch {}
+  }
+
   public broadcastSound(cue: PartySoundCue) {
     if (this.channel) {
       try {

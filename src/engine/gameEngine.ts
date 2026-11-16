@@ -738,10 +738,11 @@ export function submitFastMoneyAnswer(
   const player = session.fastMoney[playerKey];
   const newAnswers = [...player.answers];
 
+  const safePoints = Number.isFinite(points) ? Math.max(0, points) : 0;
   newAnswers[questionIndex] = {
     ...newAnswers[questionIndex],
     submittedText: answerText,
-    points: Math.max(0, points),
+    points: safePoints,
     matchedAnswerId,
     isAccepted,
   };
@@ -1264,10 +1265,17 @@ export function restartCurrentRound(session: GameSession): GameSession {
  * Concludes the game directly and transitions to FINAL_RESULTS screen.
  */
 export function endGame(session: GameSession): GameSession {
-  const winnerTeamId =
-    session.team1.score >= session.team2.score ? session.team1.id : session.team2.id;
-  const winnerName =
-    winnerTeamId === session.team1.id ? session.team1.name : session.team2.name;
+  const isTie = session.team1.score === session.team2.score;
+  const winnerTeamId = isTie
+    ? null
+    : session.team1.score > session.team2.score
+      ? session.team1.id
+      : session.team2.id;
+  const summaryMsg = isTie
+    ? 'Host concluded the game. Final Result: Tie Game!'
+    : `Host concluded the game. Final Champion: ${
+        winnerTeamId === session.team1.id ? session.team1.name : session.team2.name
+      }!`;
 
   return {
     ...session,
@@ -1275,7 +1283,7 @@ export function endGame(session: GameSession): GameSession {
     winnerTeamId,
     actionLog: [
       ...session.actionLog,
-      `Host concluded the game. Final Champion: ${winnerName}!`,
+      summaryMsg,
     ],
     updatedAt: new Date().toISOString(),
   };

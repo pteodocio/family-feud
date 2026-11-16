@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { CheckCircle2, Flame } from 'lucide-react';
 import { generateProceduralCatchphrase, type CatchphraseItem } from '../../services/localGenerators/catchphraseGenerator';
 import { SharedTimer } from '../../components/shared/SharedTimer';
@@ -6,6 +6,8 @@ import { SharedScoreboard, type ScoreboardParticipant } from '../../components/s
 import { WinnerPodiumModal } from '../../components/shared/WinnerPodiumModal';
 import { hubSyncBus } from '../../sync/hubSync';
 import { soundManager } from '../../audio/soundManager';
+import { loadCustomHubContent } from '../../utils/hubContentLoader';
+import { useHubHostSync } from '../../utils/useHubHostSync';
 
 interface CatchphraseHostViewProps {
   teams: ScoreboardParticipant[];
@@ -31,6 +33,11 @@ export function CatchphraseHostView({ teams: initialTeams, onEndGame, onReturnTo
   const [isGameFinished, setIsGameFinished] = useState(false);
 
   useEffect(() => {
+    const custom = loadCustomHubContent<CatchphraseItem>('catchphrase');
+    if (custom) {
+      setPhrases(custom);
+      return;
+    }
     generateProceduralCatchphrase({ count: 20 }).then((res) => {
       setPhrases(res);
     });
@@ -42,9 +49,8 @@ export function CatchphraseHostView({ teams: initialTeams, onEndGame, onReturnTo
     category: 'Pinoy Culture',
   };
 
-  // Broadcast to TV
-  useEffect(() => {
-    hubSyncBus.broadcastStateUpdate({
+  const syncPayload = useMemo(
+    () => ({
       gameId: 'catchphrase',
       category: currentPhrase.category,
       activeTeamName: teams[activeTeamIdx]?.name || 'Team 1',
@@ -52,8 +58,10 @@ export function CatchphraseHostView({ teams: initialTeams, onEndGame, onReturnTo
       wordsPassed,
       teams,
       isGameFinished,
-    });
-  }, [currentPhrase, activeTeamIdx, wordsPassed, teams, isGameFinished]);
+    }),
+    [currentPhrase, activeTeamIdx, wordsPassed, teams, isGameFinished]
+  );
+  useHubHostSync(syncPayload);
 
   const handleGuessedAndPass = () => {
     soundManager.playPartyCue('correct');
@@ -114,6 +122,7 @@ export function CatchphraseHostView({ teams: initialTeams, onEndGame, onReturnTo
 
           <button
             onClick={() => {
+              setTimerRunning(false);
               setIsGameFinished(true);
               onEndGame(teams);
             }}

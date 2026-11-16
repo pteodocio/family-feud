@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Flame } from 'lucide-react';
 import { hubSyncBus } from '../../sync/hubSync';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
+import { TvFinalResultsBanner } from '../../components/shared/TvFinalResultsBanner';
 
 interface CatchphraseTvState {
   gameId: string;
@@ -50,6 +51,10 @@ export function CatchphraseTvView() {
         <p className="text-slate-400 mt-2">Waiting for Host to start timer...</p>
       </div>
     );
+  }
+
+  if (state.isGameFinished) {
+    return <TvFinalResultsBanner gameTitle="Catchphrase" teams={state.teams} />;
   }
 
   const isTickingFast = timerState.remaining <= 15;

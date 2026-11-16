@@ -77,8 +77,15 @@ export function GlobalSettingsPage() {
 
   const handleResetDefaults = async () => {
     if (confirm('Reset starter packs and settings to defaults? Your custom question packs and game history will be kept.')) {
-      await initializeDatabase();
-      setNotification('Starter packs re-seeded successfully.');
+      await initializeDatabase(true);
+      setSettings(DEFAULT_SETTINGS);
+      soundManager.setMasterVolume(DEFAULT_SETTINGS.masterVolume);
+      soundManager.setEffectsVolume(DEFAULT_SETTINGS.effectsVolume);
+      soundManager.setBgmVolume(DEFAULT_SETTINGS.bgmVolume);
+      soundManager.setMuted(!DEFAULT_SETTINGS.soundEnabled);
+      soundManager.setEffectsEnabled(DEFAULT_SETTINGS.effectsEnabled);
+      soundManager.setBgmEnabled(DEFAULT_SETTINGS.bgmEnabled);
+      setNotification('Starter packs and settings reset to defaults.');
       setTimeout(() => setNotification(null), 3000);
     }
   };

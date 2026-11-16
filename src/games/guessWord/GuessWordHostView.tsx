@@ -91,6 +91,7 @@ export function GuessWordHostView({ teams: initialTeams, onEndGame, onReturnToHu
   };
 
   const handleCorrectGuess = (teamId: string) => {
+    if (isWordRevealed || isGameFinished) return;
     setTeams((prev) =>
       prev.map((t) => (t.id === teamId ? { ...t, score: t.score + currentAvailablePoints } : t))
     );
@@ -116,8 +117,17 @@ export function GuessWordHostView({ teams: initialTeams, onEndGame, onReturnToHu
         category: selectedCategory === 'All' ? undefined : selectedCategory,
       });
       if (fresh) {
-        setPuzzles((prev) => [...prev, fresh]);
-        setPuzzleIndex(puzzles.length);
+        const alignedFresh =
+          selectedCategory === 'All' || fresh.category === selectedCategory
+            ? fresh
+            : { ...fresh, category: selectedCategory };
+        const updatedAll = [...puzzles, alignedFresh];
+        const nextFiltered =
+          selectedCategory === 'All'
+            ? updatedAll
+            : updatedAll.filter((p) => p.category === selectedCategory);
+        setPuzzles(updatedAll);
+        setPuzzleIndex(Math.max(0, nextFiltered.length - 1));
         setIsWordRevealed(false);
         setRevealedClueCount(1);
         setTimerRunning(false);
@@ -304,7 +314,8 @@ export function GuessWordHostView({ teams: initialTeams, onEndGame, onReturnToHu
 
                 <button
                   onClick={() => handleCorrectGuess(t.id)}
-                  className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-colors active:scale-95 shadow"
+                  disabled={isWordRevealed}
+                  className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold transition-colors active:scale-95 shadow"
                 >
                   +{currentAvailablePoints} pts
                 </button>

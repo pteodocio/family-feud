@@ -73,14 +73,16 @@ export function GameSetupPage() {
     }
 
     const multipliers = [1, 1, 2, 3, 3, 3].slice(0, actualRoundsCount);
+    const clampInt = (n: number, min: number, max: number, fallback: number) =>
+      Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : fallback;
 
     const config: GameConfig = {
       roundsCount: actualRoundsCount,
       multipliers,
       targetScore: 300,
-      fastMoneyTimer1,
-      fastMoneyTimer2,
-      fastMoneyTarget,
+      fastMoneyTimer1: clampInt(fastMoneyTimer1, 10, 120, 20),
+      fastMoneyTimer2: clampInt(fastMoneyTimer2, 10, 120, 25),
+      fastMoneyTarget: clampInt(fastMoneyTarget, 50, 500, 200),
       faceOffTieRule: 'hostDecision',
     };
 
@@ -210,8 +212,13 @@ export function GameSetupPage() {
                   </label>
                   <input
                     type="number"
+                    min={50}
+                    max={500}
                     value={fastMoneyTarget}
-                    onChange={(e) => setFastMoneyTarget(Number(e.target.value))}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      if (Number.isFinite(v)) setFastMoneyTarget(Math.max(1, v));
+                    }}
                     className="w-full bg-black/60 border border-blue-700 rounded-lg p-2 text-white font-bold font-mono"
                   />
                 </div>
@@ -222,8 +229,13 @@ export function GameSetupPage() {
                   </label>
                   <input
                     type="number"
+                    min={10}
+                    max={120}
                     value={fastMoneyTimer1}
-                    onChange={(e) => setFastMoneyTimer1(Number(e.target.value))}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      if (Number.isFinite(v)) setFastMoneyTimer1(Math.max(10, Math.min(120, v)));
+                    }}
                     className="w-full bg-black/60 border border-blue-700 rounded-lg p-2 text-white font-bold font-mono"
                   />
                 </div>
@@ -234,8 +246,13 @@ export function GameSetupPage() {
                   </label>
                   <input
                     type="number"
+                    min={10}
+                    max={120}
                     value={fastMoneyTimer2}
-                    onChange={(e) => setFastMoneyTimer2(Number(e.target.value))}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      if (Number.isFinite(v)) setFastMoneyTimer2(Math.max(10, Math.min(120, v)));
+                    }}
                     className="w-full bg-black/60 border border-blue-700 rounded-lg p-2 text-white font-bold font-mono"
                   />
                 </div>

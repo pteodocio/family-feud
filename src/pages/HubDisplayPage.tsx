@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Maximize, Minimize, Bell } from 'lucide-react';
 import { TriviaTvView } from '../games/trivia/TriviaTvView';
 import { CharadesTvView } from '../games/charades/CharadesTvView';
@@ -18,6 +18,7 @@ import { EliminationTvView } from '../games/elimination/EliminationTvView';
 import { soundManager } from '../audio/soundManager';
 import { hubSyncBus } from '../sync/hubSync';
 import { loadSettings } from '../db/database';
+import { getGameById } from '../games/registry';
 
 interface HubDisplayPageProps {
   gameId: string;
@@ -25,11 +26,14 @@ interface HubDisplayPageProps {
 
 export function HubDisplayPage({ gameId: initialGameId }: HubDisplayPageProps) {
   const [activeGameId, setActiveGameId] = useState(initialGameId);
+  const activeGameIdRef = useRef(initialGameId);
+  const audioDestinationRef = useRef<string>('both');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [announcement, setAnnouncement] = useState<string | null>(null);
 
   useEffect(() => {
     setActiveGameId(initialGameId);
+    activeGameIdRef.current = initialGameId;
   }, [initialGameId]);
 
   useEffect(() => {
@@ -54,29 +58,28 @@ export function HubDisplayPage({ gameId: initialGameId }: HubDisplayPageProps) {
         soundManager.setEffectsVolume(s.effectsVolume);
         soundManager.setBgmVolume(s.bgmVolume);
         soundManager.setMuted(!s.soundEnabled);
+        audioDestinationRef.current = s.audioDestination || 'both';
       }
     });
 
     // Listen for party sound triggers from host
     const unsubSound = hubSyncBus.onSoundTrigger((cue) => {
-      loadSettings().then((s) => {
-        const dest = s?.audioDestination || 'both';
-        if (dest !== 'host_only') {
-          soundManager.playPartyCue(cue);
-        }
-      });
+      if (audioDestinationRef.current !== 'host_only') {
+        soundManager.playPartyCue(cue);
+      }
     });
 
     // Listen for dynamic game switching from host
     const unsubState = hubSyncBus.onStateUpdate((incoming) => {
-      if (incoming?.gameId && incoming.gameId !== activeGameId) {
+      if (incoming?.gameId && incoming.gameId !== activeGameIdRef.current) {
+        activeGameIdRef.current = incoming.gameId;
         setActiveGameId(incoming.gameId);
         window.location.hash = `#/display/hub/${incoming.gameId}`;
       }
     });
 
     // Listen for live announcements from host
-    let announcementTimer: any = null;
+    let announcementTimer: ReturnType<typeof setTimeout> | null = null;
     const unsubAnnouncement = hubSyncBus.onAnnouncement((a) => {
       setAnnouncement(a.text);
       soundManager.playPartyCue('whistle');
@@ -101,7 +104,9 @@ export function HubDisplayPage({ gameId: initialGameId }: HubDisplayPageProps) {
       unsubState();
       unsubAnnouncement();
     };
-  }, [activeGameId]);
+  }, []);
+
+  const isKnownHubGame = Boolean(getGameById(activeGameId)) && activeGameId !== 'family-feud';
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -139,8 +144,25 @@ export function HubDisplayPage({ gameId: initialGameId }: HubDisplayPageProps) {
         </div>
       )}
 
+      {/* Unknown Game Fallback */}
+      {!isKnownHubGame && (
+        <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center">
+          <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-8 max-w-md w-full space-y-3">
+            <span className="text-xs font-bold uppercase tracking-widest text-amber-400">
+              TV Display Standby
+            </span>
+            <h1 className="font-display font-black text-2xl text-white">
+              TV Game Not Found
+            </h1>
+            <p className="text-xs text-slate-400">
+              No TV board matches "{activeGameId}". Open TV Display from the active Host Console to reconnect.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Dynamic Game TV Board */}
-      {activeGameId === 'family-trivia' && <TriviaTvView />}
+      {isKnownHubGame && activeGameId === 'family-trivia' && <TriviaTvView />}
       {activeGameId === 'charades' && <CharadesTvView />}
       {activeGameId === 'pictionary' && <PictionaryTvView />}
       {activeGameId === 'family-bingo' && <BingoTvView />}

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Heart, ShieldAlert } from 'lucide-react';
 import { hubSyncBus } from '../../sync/hubSync';
 import { SharedScoreboard, type ScoreboardParticipant } from '../../components/shared/SharedScoreboard';
+import { TvFinalResultsBanner } from '../../components/shared/TvFinalResultsBanner';
 
 interface EliminationTvState {
   gameId: string;
@@ -51,6 +52,10 @@ export function EliminationTvView() {
         <p className="text-slate-400 mt-2">Waiting for Host to start survival round...</p>
       </div>
     );
+  }
+
+  if (state.isGameFinished) {
+    return <TvFinalResultsBanner gameTitle="Trivia Elimination" teams={state.teams} />;
   }
 
   return (

@@ -95,17 +95,19 @@ export function GameSetupHubPage({ gameId }: GameSetupHubPageProps) {
           { id: 'p2', name: 'Player 2', score: 0, color: 'red' },
         ];
       } else {
-        participants = activePlayers.map((p) => ({
+        const soloColors = ['blue', 'red', 'gold', 'emerald'] as const;
+        participants = activePlayers.map((p, idx) => ({
           id: p.id,
           name: p.name,
           score: 0,
-          color: 'blue',
+          color: soloColors[idx % soloColors.length],
         }));
       }
     }
 
     // Persist chosen setup in sessionStorage for the host session
     sessionStorage.setItem(`hub_participants_${gameId}`, JSON.stringify(participants));
+    sessionStorage.setItem(`hub_game_mode_${gameId}`, mode);
     navigate(`/games/${gameId}/host`);
   };
 

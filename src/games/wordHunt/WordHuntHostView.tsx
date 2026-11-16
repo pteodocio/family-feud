@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Grid, RefreshCw, Check, X } from 'lucide-react';
 import { generateProceduralWordHunt, checkWordPathOnGrid } from '../../services/localGenerators/wordHuntGenerator';
 import { SharedTimer } from '../../components/shared/SharedTimer';
@@ -6,6 +6,8 @@ import { SharedScoreboard, type ScoreboardParticipant } from '../../components/s
 import { WinnerPodiumModal } from '../../components/shared/WinnerPodiumModal';
 import { hubSyncBus } from '../../sync/hubSync';
 import { soundManager } from '../../audio/soundManager';
+import { loadCustomHubContent } from '../../utils/hubContentLoader';
+import { useHubHostSync } from '../../utils/useHubHostSync';
 
 interface WordHuntHostViewProps {
   teams: ScoreboardParticipant[];
@@ -23,44 +25,70 @@ export function WordHuntHostView({ teams: initialTeams, onEndGame, onReturnToHub
         ]
   );
 
-  const [grid, setGrid] = useState<string[][]>([
-    ['C', 'A', 'T', 'S'],
-    ['O', 'R', 'E', 'P'],
-    ['D', 'O', 'G', 'S'],
-    ['F', 'I', 'S', 'H'],
-  ]);
+  const [grid, setGrid] = useState<string[][]>(() => {
+    const custom = loadCustomHubContent<{ grid: string[][] }>('word-hunt');
+    if (custom && Array.isArray(custom[0]?.grid) && custom[0].grid.length === 4) {
+      return custom[0].grid;
+    }
+    return [
+      ['C', 'A', 'T', 'S'],
+      ['O', 'R', 'E', 'P'],
+      ['D', 'O', 'G', 'S'],
+      ['F', 'I', 'S', 'H'],
+    ];
+  });
 
   const [timerRunning, setTimerRunning] = useState(false);
   const [roundNumber, setRoundNumber] = useState(1);
+  const [boardVersion, setBoardVersion] = useState(1);
   const [isScoringRound, setIsScoringRound] = useState(false);
+  const [isRoundScored, setIsRoundScored] = useState(false);
   const [submittedWords, setSubmittedWords] = useState<Record<string, string[]>>({});
   const [currentInputs, setCurrentInputs] = useState<Record<string, string>>({});
   const [isGameFinished, setIsGameFinished] = useState(false);
 
-  const startNewBoard = async () => {
+  const startNewBoard = async (advanceRound: boolean = false) => {
     const res = await generateProceduralWordHunt();
     setGrid(res.grid);
     setSubmittedWords({});
     setCurrentInputs({});
     setIsScoringRound(false);
+    setIsRoundScored(false);
     setTimerRunning(false);
+    setBoardVersion((prev) => prev + 1);
+    if (advanceRound) {
+      setRoundNumber((prev) => prev + 1);
+    }
   };
 
   useEffect(() => {
-    startNewBoard();
+    const custom = loadCustomHubContent<{ grid: string[][] }>('word-hunt');
+    if (custom && Array.isArray(custom[0]?.grid) && custom[0].grid.length === 4) {
+      return;
+    }
+    let active = true;
+    generateProceduralWordHunt().then((res) => {
+      if (active) {
+        setGrid(res.grid);
+      }
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
-  // Broadcast to TV
-  useEffect(() => {
-    hubSyncBus.broadcastStateUpdate({
+  const syncPayload = useMemo(
+    () => ({
       gameId: 'word-hunt',
       grid,
       roundNumber,
       isScoringRound,
       teams,
       isGameFinished,
-    });
-  }, [grid, roundNumber, isScoringRound, teams, isGameFinished]);
+    }),
+    [grid, roundNumber, isScoringRound, teams, isGameFinished]
+  );
+  useHubHostSync(syncPayload);
 
   const getBoggleScore = (word: string) => {
     const len = word.length;
@@ -76,15 +104,21 @@ export function WordHuntHostView({ teams: initialTeams, onEndGame, onReturnToHub
     const text = (currentInputs[teamId] || '').trim().toUpperCase();
     if (!text || text.length < 3) return;
 
-    setSubmittedWords((prev) => ({
-      ...prev,
-      [teamId]: [...(prev[teamId] || []), text],
-    }));
+    setSubmittedWords((prev) => {
+      const existing = prev[teamId] || [];
+      if (existing.includes(text)) return prev;
+      return {
+        ...prev,
+        [teamId]: [...existing, text],
+      };
+    });
 
     setCurrentInputs((prev) => ({ ...prev, [teamId]: '' }));
   };
 
   const handleCalculateRoundScores = () => {
+    if (isRoundScored) return;
+    setIsRoundScored(true);
     soundManager.playPartyCue('round_win');
     hubSyncBus.broadcastSoundTrigger('round_win');
 
@@ -122,14 +156,14 @@ export function WordHuntHostView({ teams: initialTeams, onEndGame, onReturnToHub
           </div>
           <div>
             <h2 className="font-display font-black text-xl text-white">Word Hunt Console</h2>
-            <p className="text-xs text-slate-400">4x4 Boggle letter matrix race · Adjacent path scoring</p>
+            <p className="text-xs text-slate-400">Round {roundNumber} · 4x4 Boggle letter matrix race · Adjacent path scoring</p>
           </div>
         </div>
 
         <div className="flex items-center gap-4">
           <SharedTimer
             initialSeconds={90}
-            resetKey={grid.flat().join('')}
+            resetKey={boardVersion}
             isRunning={timerRunning}
             onExpire={() => {
               setTimerRunning(false);
@@ -143,6 +177,7 @@ export function WordHuntHostView({ teams: initialTeams, onEndGame, onReturnToHub
 
           <button
             onClick={() => {
+              setTimerRunning(false);
               setIsGameFinished(true);
               onEndGame(teams);
             }}
@@ -157,12 +192,12 @@ export function WordHuntHostView({ teams: initialTeams, onEndGame, onReturnToHub
         <div className="lg:col-span-2 space-y-4">
           {/* 4x4 Grid Display */}
           <div className="p-6 rounded-3xl bg-slate-900 border-2 border-teal-500/50 shadow-2xl flex flex-col items-center">
-            <div className="grid grid-cols-4 gap-2.5 max-w-sm w-full my-4">
+            <div className="grid grid-cols-4 gap-2 sm:gap-2.5 max-w-sm w-full my-4 justify-items-center">
               {grid.map((row, rIdx) =>
                 row.map((char, cIdx) => (
                   <div
                     key={`${rIdx}-${cIdx}`}
-                    className="w-16 h-16 rounded-2xl bg-slate-950 border-2 border-teal-500/40 font-display font-black text-2xl text-white flex items-center justify-center shadow-lg"
+                    className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-slate-950 border-2 border-teal-500/40 font-display font-black text-2xl text-white flex items-center justify-center shadow-lg"
                   >
                     {char}
                   </div>
@@ -170,13 +205,22 @@ export function WordHuntHostView({ teams: initialTeams, onEndGame, onReturnToHub
               )}
             </div>
 
-            <div className="mt-2 flex items-center gap-3">
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
               <button
-                onClick={startNewBoard}
+                onClick={() => startNewBoard(true)}
                 className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 flex items-center gap-1.5"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 Roll New 4x4 Board
+              </button>
+              <button
+                onClick={() => {
+                  setTimerRunning(false);
+                  setIsScoringRound(true);
+                }}
+                className="px-4 py-2 rounded-xl bg-teal-600/20 hover:bg-teal-600/30 border border-teal-500/40 text-xs font-bold text-teal-300"
+              >
+                Stop & Enter Words
               </button>
             </div>
           </div>
@@ -238,9 +282,12 @@ export function WordHuntHostView({ teams: initialTeams, onEndGame, onReturnToHub
 
               <button
                 onClick={handleCalculateRoundScores}
-                className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-display font-black text-sm shadow transition-transform active:scale-95"
+                disabled={isRoundScored}
+                className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-display font-black text-sm shadow transition-transform active:scale-95"
               >
-                Apply Valid Words & Tally Scores!
+                {isRoundScored
+                  ? 'Scores Applied (Roll New Board for Next Round)'
+                  : 'Apply Valid Words & Tally Scores!'}
               </button>
             </div>
           )}
@@ -264,8 +311,10 @@ export function WordHuntHostView({ teams: initialTeams, onEndGame, onReturnToHub
           gameTitle="Word Hunt Championship"
           onPlayAgain={() => {
             setIsGameFinished(false);
+            setTimerRunning(false);
+            setIsRoundScored(false);
             setRoundNumber(1);
-            startNewBoard();
+            startNewBoard(false);
             setTeams((prev) => prev.map((t) => ({ ...t, score: 0 })));
           }}
           onReturnToHub={onReturnToHub}

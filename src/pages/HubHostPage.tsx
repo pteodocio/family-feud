@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Tv, Bell, Send, X } from 'lucide-react';
 import { useRouter } from '../router/Router';
 import { TriviaHostView } from '../games/trivia/TriviaHostView';
@@ -19,6 +19,9 @@ import { EliminationHostView } from '../games/elimination/EliminationHostView';
 import { recordGameHistory } from '../db/hubDatabase';
 import { getGameById } from '../games/registry';
 import { hubSyncBus } from '../sync/hubSync';
+import { resolveMatchOutcome } from '../utils/winnerResolution';
+import { recordActiveTournamentIfMatching } from '../services/tournamentManager';
+import type { GameCatalogId } from '../types/hub';
 import type { ScoreboardParticipant } from '../components/shared/SharedScoreboard';
 
 interface HubHostPageProps {
@@ -34,8 +37,12 @@ export function HubHostPage({ gameId }: HubHostPageProps) {
   const [isAnnounceModalOpen, setIsAnnounceModalOpen] = useState(false);
   const [announceText, setAnnounceText] = useState('');
   const [notificationMsg, setNotificationMsg] = useState<string | null>(null);
+  const hasRecordedEndRef = useRef(false);
 
   useEffect(() => {
+    hasRecordedEndRef.current = false;
+    hubSyncBus.clearTimerState();
+
     const raw = sessionStorage.getItem(`hub_participants_${gameId}`);
     if (raw) {
       try {
@@ -44,7 +51,7 @@ export function HubHostPage({ gameId }: HubHostPageProps) {
     }
 
     // TV Pulse listener to update connection status
-    let timeout: any = null;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
     const unsubPulse = hubSyncBus.onTvPulse((pulse) => {
       if (pulse.connected) {
         setIsTvConnected(true);
@@ -58,30 +65,75 @@ export function HubHostPage({ gameId }: HubHostPageProps) {
     return () => {
       if (timeout) clearTimeout(timeout);
       unsubPulse();
+      hubSyncBus.clearTimerState();
     };
   }, [gameId]);
 
+  if (!game || gameId === 'family-feud') {
+    return (
+      <div className="min-h-screen bg-[#060b18] text-white flex flex-col items-center justify-center p-8 text-center">
+        <h1 className="font-display font-black text-2xl mb-2">Game Not Found</h1>
+        <p className="text-xs text-slate-400 mb-5">
+          No Hub console matches "{gameId}".
+        </p>
+        <button
+          onClick={() => navigate('/')}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-xs font-bold"
+        >
+          Return to Hub
+        </button>
+      </div>
+    );
+  }
+
   const handleEndGame = async (finalScores: ScoreboardParticipant[]) => {
-    const sorted = [...finalScores].sort((a, b) => b.score - a.score);
-    const winner = sorted[0];
+    if (hasRecordedEndRef.current) return;
+    hasRecordedEndRef.current = true;
+
+    const outcome = resolveMatchOutcome(finalScores);
+    const { sorted, topScore, winners, isTie } = outcome;
     const duration = Math.round((Date.now() - startTime) / 1000);
+    const storedMode = sessionStorage.getItem(`hub_game_mode_${gameId}`);
+    const gameMode: 'team' | 'individual' = storedMode === 'individual' ? 'individual' : 'team';
+
+    const winnerName =
+      winners.length === 0
+        ? 'Everyone'
+        : isTie
+        ? `Tie: ${winners.map((w) => w.name).join(' & ')}`
+        : winners[0].name;
 
     await recordGameHistory({
       id: `match_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       gameId,
-      gameTitle: game?.name || gameId,
+      gameTitle: game.name || gameId,
       datePlayed: new Date().toISOString(),
       durationSeconds: duration,
-      gameMode: 'team',
-      participants: sorted.map((p, idx) => ({
+      gameMode,
+      participants: sorted.map((p) => ({
         id: p.id,
         name: p.name,
         score: p.score,
-        isWinner: idx === 0,
+        isWinner: p.score === topScore,
       })),
-      winnerName: winner ? winner.name : 'Everyone',
-      winnerScore: winner ? winner.score : 0,
+      winnerName,
+      winnerScore: topScore,
     });
+
+    const updatedTournament = recordActiveTournamentIfMatching(
+      gameId as GameCatalogId,
+      sorted.map((p) => ({ name: p.name, score: p.score }))
+    );
+    if (updatedTournament) {
+      setNotificationMsg(
+        updatedTournament.isFinished
+          ? `Tournament "${updatedTournament.title}" completed! Return to Hub to view final standings.`
+          : `Tournament Round recorded! Next up: ${
+              updatedTournament.rounds[updatedTournament.currentRoundIndex]?.gameName || 'Next Round'
+            }`
+      );
+      setTimeout(() => setNotificationMsg(null), 5000);
+    }
   };
 
   const handleOpenTv = () => {
